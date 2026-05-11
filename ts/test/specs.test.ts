@@ -13,7 +13,7 @@ import { join } from 'node:path'
 import { Jsonic } from 'jsonic'
 import { Feed, detect } from '../dist/feed.js'
 
-const SPECS_DIR = join(__dirname, '..', 'test', 'specs')
+const SPECS_DIR = join(__dirname, '..', '..', 'test', 'specs')
 
 const atomParse = Jsonic.make().use(Feed)
 const nativeParse = Jsonic.make().use(Feed, { format: 'native' })

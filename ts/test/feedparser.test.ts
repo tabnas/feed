@@ -18,7 +18,7 @@ import type {
   FeedVersion,
 } from '../dist/feed.js'
 
-const SUITE_DIR = join(__dirname, '..', 'test', 'feedparser-wellformed')
+const SUITE_DIR = join(__dirname, '..', '..', 'test', 'feedparser-wellformed')
 
 // Read all .xml files in a subdirectory.
 function loadDir(name: string): { file: string; src: string }[] {
