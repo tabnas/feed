@@ -1,6 +1,6 @@
 # test/specs
 
-Cross-language test fixtures for `@jsonic/feed`. Each spec is a pair (or
+Cross-language test fixtures for `@tabnas/feed`. Each spec is a pair (or
 triple) of files sharing a base name:
 
 ```

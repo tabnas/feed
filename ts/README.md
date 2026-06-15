@@ -1,7 +1,7 @@
-# @jsonic/feed
+# @tabnas/feed
 
 A [Jsonic](https://jsonic.senecajs.org) plugin — built on
-[`@jsonic/xml`](https://github.com/jsonicjs/xml) — that parses
+[`@tabnas/xml`](https://github.com/tabnas/xml) — that parses
 syndication feeds (**RSS 0.90, 0.91, 0.92, 1.0, 2.0** and **Atom 0.3,
 1.0**) into a typed structure. By default every dialect is normalised
 to an Atom-shaped result, so the same downstream code can consume
@@ -11,11 +11,11 @@ The same parser is available in two languages:
 
 | Language   | Package                                                        | Source                       | Docs                              |
 | ---------- | -------------------------------------------------------------- | ---------------------------- | --------------------------------- |
-| TypeScript | [`@jsonic/feed`](https://npmjs.com/package/@jsonic/feed)       | [`src/feed.ts`](src/feed.ts) | this file                         |
-| Go         | [`github.com/jsonicjs/feed/go`](https://github.com/jsonicjs/feed/tree/main/go) | [`go/feed.go`](go/feed.go) | [`go/README.md`](go/README.md) |
+| TypeScript | [`@tabnas/feed`](https://npmjs.com/package/@tabnas/feed)       | [`src/feed.ts`](src/feed.ts) | this file                         |
+| Go         | [`github.com/tabnas/feed/go`](https://github.com/tabnas/feed/tree/main/go) | [`go/feed.go`](go/feed.go) | [`go/README.md`](go/README.md) |
 
-[![npm version](https://img.shields.io/npm/v/@jsonic/feed.svg)](https://npmjs.com/package/@jsonic/feed)
-[![build](https://github.com/jsonicjs/feed/actions/workflows/build.yml/badge.svg)](https://github.com/jsonicjs/feed/actions/workflows/build.yml)
+[![npm version](https://img.shields.io/npm/v/@tabnas/feed.svg)](https://npmjs.com/package/@tabnas/feed)
+[![build](https://github.com/tabnas/feed/actions/workflows/build.yml/badge.svg)](https://github.com/tabnas/feed/actions/workflows/build.yml)
 
 
 | ![Voxgig](https://www.voxgig.com/res/img/vgt01r.png) | This open source module is sponsored and supported by [Voxgig](https://www.voxgig.com). |
@@ -49,14 +49,14 @@ the rest of the docs.
 Install the plugin and its peer dependencies:
 
 ```bash
-npm install @jsonic/feed jsonic @jsonic/xml
+npm install @tabnas/feed @tabnas/jsonic @tabnas/xml
 ```
 
 Create `index.ts`:
 
 ```typescript
-import { Jsonic } from 'jsonic'
-import { Feed } from '@jsonic/feed'
+import { Jsonic } from '@tabnas/jsonic'
+import { Feed } from '@tabnas/feed'
 
 const j = Jsonic.make().use(Feed)
 
@@ -94,7 +94,7 @@ Initialise a module and pull in the plugin:
 
 ```bash
 go mod init example
-go get github.com/jsonicjs/feed/go
+go get github.com/tabnas/feed/go
 ```
 
 Create `main.go`:
@@ -104,8 +104,8 @@ package main
 
 import (
     "fmt"
-    jsonic "github.com/jsonicjs/jsonic/go"
-    feed "github.com/jsonicjs/feed/go"
+    jsonic "github.com/tabnas/jsonic/go"
+    feed "github.com/tabnas/feed/go"
 )
 
 func main() {
@@ -144,7 +144,7 @@ When you need RSS-specific fields like `ttl`, `cloud`, or `skipDays`
 that the Atom shape does not carry, ask for the native form:
 
 ```typescript
-import { Feed, type Rss2Feed } from '@jsonic/feed'
+import { Feed, type Rss2Feed } from '@tabnas/feed'
 const j = Jsonic.make().use(Feed, { format: 'native' })
 const native = j(rssSource) as Rss2Feed
 // native.ttl, native.cloud, native.skipDays
@@ -170,7 +170,7 @@ The native return type is a discriminated union on `format`:
 
 When even the native shape is not enough — for example you need a
 non-standard namespace extension like `<media:content>` — drop down
-to the raw element tree from `@jsonic/xml`:
+to the raw element tree from `@tabnas/xml`:
 
 ```typescript
 const j = Jsonic.make().use(Feed, { format: 'raw' })
@@ -192,7 +192,7 @@ Use `format: 'raw'` to get the underlying XML tree, then call
 `detect`:
 
 ```typescript
-import { Feed, detect } from '@jsonic/feed'
+import { Feed, detect } from '@tabnas/feed'
 const j = Jsonic.make().use(Feed, { format: 'raw' })
 const { dialect, version } = detect(j(rssSource))
 // e.g. { dialect: 'rss', version: 'rss20' }
@@ -226,7 +226,7 @@ Atom shape.
 **TypeScript**
 
 ```typescript
-import { Feed } from '@jsonic/feed'
+import { Feed } from '@tabnas/feed'
 const j = Jsonic.make().use(Feed, options?)
 const result = j(src)
 ```
@@ -253,7 +253,7 @@ The `format` option determines which type the parser returns:
 |------------|---------------------------------------------|---------------------------------------------|
 | `'atom'`   | `AtomFeed`                                  | `feed.AtomFeed`                             |
 | `'native'` | `AtomFeed \| Rss2Feed \| Rss1Feed`          | `feed.AtomFeed` / `feed.Rss2Feed` / `feed.Rss1Feed` |
-| `'raw'`    | `XmlElement` (from `@jsonic/xml`)           | `map[string]any`                            |
+| `'raw'`    | `XmlElement` (from `@tabnas/xml`)           | `map[string]any`                            |
 
 ### Atom shape (RFC 4287)
 
@@ -403,13 +403,13 @@ Mapping RSS to Atom is not bijective. The default conversion drops:
 If any of these matter, parse with `format: 'native'` and read the
 dialect-specific structure directly.
 
-### Composition with `@jsonic/xml`
+### Composition with `@tabnas/xml`
 
-The plugin layers on top of [`@jsonic/xml`](https://github.com/jsonicjs/xml)
+The plugin layers on top of [`@tabnas/xml`](https://github.com/tabnas/xml)
 in three tiers:
 
 ```
-src ──► @jsonic/xml ──► native parser ──► Atom converter
+src ──► @tabnas/xml ──► native parser ──► Atom converter
         (XmlElement)    (Rss2Feed/...)    (AtomFeed)
         format:'raw'    format:'native'   format:'atom'  (default)
 ```
@@ -417,7 +417,7 @@ src ──► @jsonic/xml ──► native parser ──► Atom converter
 Each tier is exposed by a `format` option, so you can stop at
 whichever level your application needs. Internally, the Feed plugin
 calls `jsonic.use(Xml)` itself and registers a `bc` (before-close)
-hook on the `xml` rule that runs after `@jsonic/xml`'s own
+hook on the `xml` rule that runs after `@tabnas/xml`'s own
 `@xml-bc`. The hook gates on `r.child.node` — the same idiom
 `@xml-bc` uses — so it runs exactly once even when the grammar's
 trailing-whitespace recursion fires `bc` again.

@@ -10,7 +10,7 @@ import assert from 'node:assert'
 import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { Jsonic } from 'jsonic'
+import { Jsonic } from '@tabnas/jsonic'
 import { Feed, detect } from '../dist/feed.js'
 import type {
   AtomFeed,

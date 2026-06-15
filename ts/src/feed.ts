@@ -1,14 +1,14 @@
 /* Copyright (c) 2021-2025 Richard Rodger and other contributors, MIT License */
 
 // Plugin that parses RSS (0.90, 0.91, 0.92, 1.0, 2.0) and Atom (0.3, 1.0)
-// feeds. Built on top of @jsonic/xml. By default all feed dialects are
+// feeds. Built on top of @tabnas/xml. By default all feed dialects are
 // converted to a normalized Atom-shaped result; pass `{ format: 'native' }`
 // to keep the source dialect's structure, or `{ format: 'raw' }` to get
-// back the underlying XmlElement tree from @jsonic/xml.
+// back the underlying XmlElement tree from @tabnas/xml.
 
-import { Jsonic, Plugin } from 'jsonic'
-import { Xml } from '@jsonic/xml'
-import type { XmlElement } from '@jsonic/xml'
+import { Jsonic, Plugin } from '@tabnas/jsonic'
+import { Xml } from '@tabnas/xml'
+import type { XmlElement } from '@tabnas/xml'
 
 
 // --- Public types ---------------------------------------------------------
@@ -32,7 +32,7 @@ type FeedOptions = {
   // Output shape:
   //   'atom'   - normalized Atom-shaped object (the default)
   //   'native' - dialect-specific structure (Atom*/Rss2*/Rss1*)
-  //   'raw'    - the XmlElement tree from @jsonic/xml
+  //   'raw'    - the XmlElement tree from @tabnas/xml
   format?: FeedFormat
 }
 

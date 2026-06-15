@@ -1,8 +1,8 @@
 # feed (Go)
 
-A Go port of [`@jsonic/feed`](https://github.com/jsonicjs/feed) — a
-[Jsonic](https://github.com/jsonicjs/jsonic) plugin (built on
-[`xml`](https://github.com/jsonicjs/xml)) that parses syndication
+A Go port of [`@tabnas/feed`](https://github.com/tabnas/feed) — a
+[Jsonic](https://github.com/tabnas/jsonic) plugin (built on
+[`xml`](https://github.com/tabnas/xml)) that parses syndication
 feeds (**RSS 0.90, 0.91, 0.92, 1.0, 2.0** and **Atom 0.3, 1.0**)
 into typed Go structs. By default every dialect is normalised to an
 Atom-shaped result, so the same downstream code can consume feeds
@@ -30,7 +30,7 @@ Initialise a module and pull in the plugin:
 
 ```bash
 go mod init example
-go get github.com/jsonicjs/feed/go
+go get github.com/tabnas/feed/go
 ```
 
 Create `main.go`:
@@ -41,8 +41,8 @@ package main
 import (
     "fmt"
 
-    jsonic "github.com/jsonicjs/jsonic/go"
-    feed "github.com/jsonicjs/feed/go"
+    jsonic "github.com/tabnas/jsonic/go"
+    feed "github.com/tabnas/feed/go"
 )
 
 func main() {
@@ -84,7 +84,7 @@ format.
 concrete type is `feed.AtomFeed`; with `format: "native"` it is
 `feed.Rss2Feed`, `feed.Rss1Feed`, or `feed.AtomFeed` depending on
 the input dialect; with `format: "raw"` it is `map[string]any` (the
-raw element tree from `@jsonic/xml`).
+raw element tree from `@tabnas/xml`).
 
 
 ---
@@ -130,7 +130,7 @@ case feed.Rss1Feed:
 
 When even the native shape is not enough — for example you need a
 non-standard namespace extension like `<media:content>` — drop down
-to the raw element tree from `@jsonic/xml`:
+to the raw element tree from `@tabnas/xml`:
 
 ```go
 j := jsonic.Make()
@@ -215,7 +215,7 @@ override defaults. Pass `nil` (or omit) for defaults-only.
 |------------|--------------------------------------------------------|
 | `"atom"`   | `feed.AtomFeed`                                        |
 | `"native"` | `feed.AtomFeed` / `feed.Rss2Feed` / `feed.Rss1Feed`    |
-| `"raw"`    | `map[string]any` (the `@jsonic/xml` element tree)      |
+| `"raw"`    | `map[string]any` (the `@tabnas/xml` element tree)      |
 
 ### Atom shape (RFC 4287)
 
@@ -329,7 +329,7 @@ dialect-specific structure directly.
 ### Composition with the `xml` plugin
 
 The plugin layers on top of
-[`github.com/jsonicjs/xml/go`](https://github.com/jsonicjs/xml) in
+[`github.com/tabnas/xml/go`](https://github.com/tabnas/xml) in
 three tiers:
 
 ```

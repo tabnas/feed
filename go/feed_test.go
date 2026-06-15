@@ -12,9 +12,9 @@ import (
 	"strings"
 	"testing"
 
-	jsonic "github.com/jsonicjs/jsonic/go"
-	feed "github.com/jsonicjs/feed/go"
-	xml "github.com/jsonicjs/xml/go"
+	jsonic "github.com/tabnas/jsonic/go"
+	feed "github.com/tabnas/feed/go"
+	xml "github.com/tabnas/xml/go"
 )
 
 // specsDir resolves test/specs from the package directory.

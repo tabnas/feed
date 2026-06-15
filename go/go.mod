@@ -1,8 +1,12 @@
-module github.com/jsonicjs/feed/go
+module github.com/tabnas/feed/go
 
 go 1.24.7
 
 require (
-	github.com/jsonicjs/jsonic/go v0.1.22
-	github.com/jsonicjs/xml/go v0.1.1
+	github.com/tabnas/jsonic/go v0.0.0
+	github.com/tabnas/xml/go v0.0.0
 )
+
+replace github.com/tabnas/jsonic/go => ../../jsonic/go
+
+replace github.com/tabnas/xml/go => ../../xml/go

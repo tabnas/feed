@@ -2,7 +2,7 @@
 
 // Package feed is a Jsonic plugin that parses RSS (0.90, 0.91, 0.92, 1.0,
 // 2.0) and Atom (0.3, 1.0) syndication feeds. Built on top of
-// github.com/jsonicjs/xml/go, every dialect is normalised by default to an
+// github.com/tabnas/xml/go, every dialect is normalised by default to an
 // Atom-shaped result; pass options{"format": "native"} to keep the source
 // dialect's structure or options{"format": "raw"} to get back the raw XML
 // element tree from the xml plugin.
@@ -14,8 +14,8 @@ import (
 	"strconv"
 	"strings"
 
-	jsonic "github.com/jsonicjs/jsonic/go"
-	xml "github.com/jsonicjs/xml/go"
+	jsonic "github.com/tabnas/jsonic/go"
+	xml "github.com/tabnas/xml/go"
 )
 
 const Version = "0.1.0"
@@ -1165,7 +1165,7 @@ func rss1ToAtom(rss Rss1Feed) AtomFeed {
 // --- Top-level convert ----------------------------------------------------
 
 // Convert turns a parsed XML element tree (as produced by
-// github.com/jsonicjs/xml/go) into the requested feed shape.
+// github.com/tabnas/xml/go) into the requested feed shape.
 func Convert(root any, format string) (any, error) {
 	if format == "raw" {
 		return root, nil

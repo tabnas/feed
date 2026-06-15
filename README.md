@@ -1,4 +1,4 @@
-# @jsonic/feed
+# @tabnas/feed
 
 Parses RSS (0.90, 0.91, 0.92, 1.0, 2.0) and Atom (0.3, 1.0) feeds into a typed structure, defaulting to a normalized Atom shape.
 

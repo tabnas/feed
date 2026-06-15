@@ -8,7 +8,7 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert'
 
-import { Jsonic } from 'jsonic'
+import { Jsonic } from '@tabnas/jsonic'
 import { Feed, detect } from '../dist/feed.js'
 import type { AtomFeed } from '../dist/feed.js'
 
