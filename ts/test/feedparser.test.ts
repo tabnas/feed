@@ -10,7 +10,8 @@ import assert from 'node:assert'
 import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { Jsonic } from '@tabnas/jsonic'
+import { Tabnas } from '@tabnas/parser'
+import { jsonic } from '@tabnas/jsonic'
 import { Feed, detect } from '../dist/feed.js'
 import type {
   AtomFeed,
@@ -36,8 +37,8 @@ const RSS = loadDir('rss')
 const RDF = loadDir('rdf')
 
 // Reusable parsers — atom output (default) and raw output for detection.
-const atomParse = Jsonic.make().use(Feed)
-const rawParse = Jsonic.make().use(Feed, { format: 'raw' })
+const atomParse = new Tabnas().use(jsonic).use(Feed)
+const rawParse = new Tabnas().use(jsonic).use(Feed, { format: 'raw' })
 
 
 describe('feedparser-wellformed - dialect / version detection', () => {
@@ -56,7 +57,7 @@ describe('feedparser-wellformed - dialect / version detection', () => {
     test(label, () => {
       const fails: string[] = []
       for (const { file, src } of files) {
-        const root: any = rawParse(src)
+        const root: any = rawParse.parse(src)
         const got = detect(root)
         const versionsOk = Array.isArray(expect.version)
           ? expect.version.includes(got.version)
@@ -92,7 +93,7 @@ describe('feedparser-wellformed - parse without error', () => {
       const fails: { file: string; err: string }[] = []
       for (const { file, src } of set) {
         try {
-          const f = atomParse(src) as AtomFeed
+          const f = atomParse.parse(src) as AtomFeed
           if (f.format !== 'atom') {
             fails.push({ file, err: `format=${f.format}` })
           }
@@ -127,91 +128,91 @@ describe('feedparser-wellformed - targeted value checks', () => {
   test('atom10/entry_title -> entries[0].title.value == "Example Atom"', () => {
     const src = findFile(ATOM10, 'entry_title.xml')
     assert.ok(src, 'fixture present')
-    const f = atomParse(src!) as AtomFeed
+    const f = atomParse.parse(src!) as AtomFeed
     assert.equal(f.entries[0].title?.value, 'Example Atom')
   })
 
   test('atom10/entry_author_email -> entries[0].authors[0].email', () => {
     const src = findFile(ATOM10, 'entry_author_email.xml')
     assert.ok(src, 'fixture present')
-    const f = atomParse(src!) as AtomFeed
+    const f = atomParse.parse(src!) as AtomFeed
     assert.equal(f.entries[0].authors?.[0].email, 'me@example.com')
   })
 
   test('atom10/entry_author_name -> entries[0].authors[0].name', () => {
     const src = findFile(ATOM10, 'entry_author_name.xml')
     assert.ok(src, 'fixture present')
-    const f = atomParse(src!) as AtomFeed
+    const f = atomParse.parse(src!) as AtomFeed
     assert.equal(f.entries[0].authors?.[0].name, 'Example author')
   })
 
   test('atom10/entry_id -> entries[0].id', () => {
     const src = findFile(ATOM10, 'entry_id.xml')
     assert.ok(src, 'fixture present')
-    const f = atomParse(src!) as AtomFeed
+    const f = atomParse.parse(src!) as AtomFeed
     assert.ok(f.entries[0].id, 'id present')
   })
 
   test('atom10/entry_link_href -> entries[0].links[0].href', () => {
     const src = findFile(ATOM10, 'entry_link_href.xml')
     assert.ok(src, 'fixture present')
-    const f = atomParse(src!) as AtomFeed
+    const f = atomParse.parse(src!) as AtomFeed
     assert.ok(f.entries[0].links?.[0].href, 'href present')
   })
 
   test('atom/entry_title -> entries[0].title.value', () => {
     const src = findFile(ATOM, 'entry_title.xml')
     assert.ok(src, 'fixture present')
-    const f = atomParse(src!) as AtomFeed
+    const f = atomParse.parse(src!) as AtomFeed
     assert.ok(f.entries[0].title?.value, 'title present')
   })
 
   test('atom/entry_issued -> entries[0].published', () => {
     const src = findFile(ATOM, 'entry_issued.xml')
     assert.ok(src, 'fixture present')
-    const f = atomParse(src!) as AtomFeed
+    const f = atomParse.parse(src!) as AtomFeed
     assert.ok(f.entries[0].published, 'published present')
   })
 
   test('atom/entry_modified -> entries[0].updated', () => {
     const src = findFile(ATOM, 'entry_modified.xml')
     assert.ok(src, 'fixture present')
-    const f = atomParse(src!) as AtomFeed
+    const f = atomParse.parse(src!) as AtomFeed
     assert.ok(f.entries[0].updated, 'updated present')
   })
 
   test('rss/channel_title -> title.value == "Example feed"', () => {
     const src = findFile(RSS, 'channel_title.xml')
     assert.ok(src, 'fixture present')
-    const f = atomParse(src!) as AtomFeed
+    const f = atomParse.parse(src!) as AtomFeed
     assert.equal(f.title?.value, 'Example feed')
   })
 
   test('rss/item_title -> entries[0].title.value', () => {
     const src = findFile(RSS, 'item_title.xml')
     assert.ok(src, 'fixture present')
-    const f = atomParse(src!) as AtomFeed
+    const f = atomParse.parse(src!) as AtomFeed
     assert.equal(f.entries[0].title?.value, 'Item 1 title')
   })
 
   test('rss/item_link -> entries[0].links[0].href', () => {
     const src = findFile(RSS, 'item_link.xml')
     assert.ok(src, 'fixture present')
-    const f = atomParse(src!) as AtomFeed
+    const f = atomParse.parse(src!) as AtomFeed
     assert.ok(f.entries[0].links?.[0].href, 'href present')
   })
 
   test('rss/item_guid -> entries[0].id', () => {
     const src = findFile(RSS, 'item_guid.xml')
     assert.ok(src, 'fixture present')
-    const f = atomParse(src!) as AtomFeed
+    const f = atomParse.parse(src!) as AtomFeed
     assert.ok(f.entries[0].id, 'id present')
   })
 
   test('rss/item_enclosure_url -> entries[0].links has rel=enclosure', () => {
     const src = findFile(RSS, 'item_enclosure_url.xml')
     assert.ok(src, 'fixture present')
-    const f = atomParse(src!) as AtomFeed
+    const f = atomParse.parse(src!) as AtomFeed
     const enc = f.entries[0].links?.find((l) => l.rel === 'enclosure')
     assert.ok(enc, 'enclosure link present')
   })
@@ -219,28 +220,28 @@ describe('feedparser-wellformed - targeted value checks', () => {
   test('rdf/rdf_channel_title -> title.value == "Example feed"', () => {
     const src = findFile(RDF, 'rdf_channel_title.xml')
     assert.ok(src, 'fixture present')
-    const f = atomParse(src!) as AtomFeed
+    const f = atomParse.parse(src!) as AtomFeed
     assert.equal(f.title?.value, 'Example feed')
   })
 
   test('rdf/rdf_item_title -> entries[0].title.value == "Example title"', () => {
     const src = findFile(RDF, 'rdf_item_title.xml')
     assert.ok(src, 'fixture present')
-    const f = atomParse(src!) as AtomFeed
+    const f = atomParse.parse(src!) as AtomFeed
     assert.equal(f.entries[0].title?.value, 'Example title')
   })
 
   test('rdf/rss090_channel_title -> title.value == "Example title"', () => {
     const src = findFile(RDF, 'rss090_channel_title.xml')
     assert.ok(src, 'fixture present')
-    const f = atomParse(src!) as AtomFeed
+    const f = atomParse.parse(src!) as AtomFeed
     assert.equal(f.title?.value, 'Example title')
   })
 
   test('rdf/rdf_item_rdf_about -> entries[0].id is the rdf:about URI', () => {
     const src = findFile(RDF, 'rdf_item_rdf_about.xml')
     assert.ok(src, 'fixture present')
-    const f = atomParse(src!) as AtomFeed
+    const f = atomParse.parse(src!) as AtomFeed
     assert.equal(f.entries[0].id, 'http://example.org/1')
   })
 })

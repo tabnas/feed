@@ -29,10 +29,12 @@
     "repo-publish-quick": "npm run build && npm run test && npm run repo-tag && npm publish --access public --registry https://registry.npmjs.org "
   },
   "peerDependencies": {
+    "@tabnas/parser": ">=2",
     "@tabnas/jsonic": "file:../../jsonic/ts",
     "@tabnas/xml": "file:../../xml/ts"
   },
   "devDependencies": {
+    "@tabnas/parser": "file:../../parser/ts",
     "@tabnas/jsonic": "file:../../jsonic/ts",
     "@tabnas/xml": "file:../../xml/ts",
     "@types/node": "25.6.0",

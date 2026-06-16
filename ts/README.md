@@ -49,18 +49,19 @@ the rest of the docs.
 Install the plugin and its peer dependencies:
 
 ```bash
-npm install @tabnas/feed @tabnas/jsonic @tabnas/xml
+npm install @tabnas/feed @tabnas/parser @tabnas/jsonic @tabnas/xml
 ```
 
 Create `index.ts`:
 
 ```typescript
-import { Jsonic } from '@tabnas/jsonic'
+import { Tabnas } from '@tabnas/parser'
+import { jsonic } from '@tabnas/jsonic'
 import { Feed } from '@tabnas/feed'
 
-const j = Jsonic.make().use(Feed)
+const j = new Tabnas().use(jsonic).use(Feed)
 
-const result = j(`
+const result = j.parse(`
   <rss version="2.0">
     <channel>
       <title>My Blog</title>
@@ -144,9 +145,11 @@ When you need RSS-specific fields like `ttl`, `cloud`, or `skipDays`
 that the Atom shape does not carry, ask for the native form:
 
 ```typescript
+import { Tabnas } from '@tabnas/parser'
+import { jsonic } from '@tabnas/jsonic'
 import { Feed, type Rss2Feed } from '@tabnas/feed'
-const j = Jsonic.make().use(Feed, { format: 'native' })
-const native = j(rssSource) as Rss2Feed
+const j = new Tabnas().use(jsonic).use(Feed, { format: 'native' })
+const native = j.parse(rssSource) as Rss2Feed
 // native.ttl, native.cloud, native.skipDays
 ```
 
@@ -173,8 +176,8 @@ non-standard namespace extension like `<media:content>` — drop down
 to the raw element tree from `@tabnas/xml`:
 
 ```typescript
-const j = Jsonic.make().use(Feed, { format: 'raw' })
-const tree = j(rssSource)
+const j = new Tabnas().use(jsonic).use(Feed, { format: 'raw' })
+const tree = j.parse(rssSource)
 // tree.localName === 'rss', tree.children === [...]
 ```
 
@@ -192,9 +195,11 @@ Use `format: 'raw'` to get the underlying XML tree, then call
 `detect`:
 
 ```typescript
+import { Tabnas } from '@tabnas/parser'
+import { jsonic } from '@tabnas/jsonic'
 import { Feed, detect } from '@tabnas/feed'
-const j = Jsonic.make().use(Feed, { format: 'raw' })
-const { dialect, version } = detect(j(rssSource))
+const j = new Tabnas().use(jsonic).use(Feed, { format: 'raw' })
+const { dialect, version } = detect(j.parse(rssSource))
 // e.g. { dialect: 'rss', version: 'rss20' }
 ```
 
@@ -226,9 +231,11 @@ Atom shape.
 **TypeScript**
 
 ```typescript
+import { Tabnas } from '@tabnas/parser'
+import { jsonic } from '@tabnas/jsonic'
 import { Feed } from '@tabnas/feed'
-const j = Jsonic.make().use(Feed, options?)
-const result = j(src)
+const j = new Tabnas().use(jsonic).use(Feed, options?)
+const result = j.parse(src)
 ```
 
 **Go**
@@ -416,7 +423,7 @@ src ──► @tabnas/xml ──► native parser ──► Atom converter
 
 Each tier is exposed by a `format` option, so you can stop at
 whichever level your application needs. Internally, the Feed plugin
-calls `jsonic.use(Xml)` itself and registers a `bc` (before-close)
+calls `tn.use(Xml)` itself and registers a `bc` (before-close)
 hook on the `xml` rule that runs after `@tabnas/xml`'s own
 `@xml-bc`. The hook gates on `r.child.node` — the same idiom
 `@xml-bc` uses — so it runs exactly once even when the grammar's
@@ -449,6 +456,16 @@ value checks against it.
   Kurt McKee and Mark Pilgrim — vendored well-formed corpus, BSD
   2-Clause. See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
 
+
+
+## Grammar diagram
+
+The installed grammar as a railroad/syntax diagram, generated from the live
+grammar with [`@tabnas/railroad`](https://github.com/tabnas/railroad):
+
+![feed grammar railroad diagram](doc/grammar.svg)
+
+A vertical ASCII version is in [`doc/grammar.txt`](doc/grammar.txt).
 
 ## License
 

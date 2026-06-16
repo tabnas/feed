@@ -6,7 +6,8 @@
 // to keep the source dialect's structure, or `{ format: 'raw' }` to get
 // back the underlying XmlElement tree from @tabnas/xml.
 
-import { Jsonic, Plugin } from '@tabnas/jsonic'
+import { Tabnas } from '@tabnas/parser'
+import type { Plugin } from '@tabnas/parser'
 import { Xml } from '@tabnas/xml'
 import type { XmlElement } from '@tabnas/xml'
 
@@ -916,8 +917,13 @@ function withDefaults(o?: FeedOptions): Required<FeedOptions> {
 
 // --- jsonic Plugin --------------------------------------------------------
 
-const Feed: Plugin = function Feed(jsonic, options) {
-  jsonic.use(Xml)
+const Feed: Plugin = function Feed(tn: Tabnas, options) {
+  // `Xml` is still typed against @tabnas/jsonic's `Plugin` (its engine
+  // parameter is the legacy callable `Jsonic`), which is nominally — but
+  // not structurally — distinct from @tabnas/parser's `Plugin`. The two
+  // are runtime-compatible, so bridge the type here without changing
+  // behavior.
+  tn.use(Xml as unknown as Plugin)
   const opts = withDefaults(options as FeedOptions | undefined)
 
   // The xml rule's bc fires once per close, including extra times when
@@ -925,7 +931,7 @@ const Feed: Plugin = function Feed(jsonic, options) {
   // own guard: only run when an element was actually parsed in *this*
   // iteration (r.child.node is set), so the conversion happens exactly
   // once on the same iteration that @xml-bc copied the element to root.
-  jsonic.rule('xml', (rs) => {
+  tn.rule('xml', (rs) => {
     rs.bc(true, (rule: any, ctx: any) => {
       const child = rule.child
       if (!child || !child.node) return
