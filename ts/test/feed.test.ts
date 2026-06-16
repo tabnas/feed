@@ -8,31 +8,32 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert'
 
-import { Jsonic } from '@tabnas/jsonic'
+import { Tabnas } from '@tabnas/parser'
+import { jsonic } from '@tabnas/jsonic'
 import { Feed, detect } from '../dist/feed.js'
 import type { AtomFeed } from '../dist/feed.js'
 
 
 describe('feed - errors', () => {
   test('unrecognized root element throws', () => {
-    const j = Jsonic.make().use(Feed)
-    assert.throws(() => j('<not-a-feed/>'), /unrecognized root/)
+    const j = new Tabnas().use(jsonic).use(Feed)
+    assert.throws(() => j.parse('<not-a-feed/>'), /unrecognized root/)
   })
 })
 
 
 describe('feed - raw format', () => {
   test('returns the underlying XmlElement tree', () => {
-    const j = Jsonic.make().use(Feed, { format: 'raw' })
-    const root: any = j('<feed xmlns="http://www.w3.org/2005/Atom"><title>Hi</title></feed>')
+    const j = new Tabnas().use(jsonic).use(Feed, { format: 'raw' })
+    const root: any = j.parse('<feed xmlns="http://www.w3.org/2005/Atom"><title>Hi</title></feed>')
     assert.equal(root.localName, 'feed')
     assert.equal(root.namespace, 'http://www.w3.org/2005/Atom')
     assert.ok(Array.isArray(root.children))
   })
 
   test('detect on raw output identifies the dialect', () => {
-    const j = Jsonic.make().use(Feed, { format: 'raw' })
-    const root: any = j('<rss version="2.0"><channel><title>x</title></channel></rss>')
+    const j = new Tabnas().use(jsonic).use(Feed, { format: 'raw' })
+    const root: any = j.parse('<rss version="2.0"><channel><title>x</title></channel></rss>')
     assert.deepEqual(detect(root), { dialect: 'rss', version: 'rss20' })
   })
 })
@@ -40,15 +41,15 @@ describe('feed - raw format', () => {
 
 describe('feed - plugin form', () => {
   test('default is atom', () => {
-    const j = Jsonic.make().use(Feed)
-    const f = j('<feed xmlns="http://www.w3.org/2005/Atom"/>') as AtomFeed
+    const j = new Tabnas().use(jsonic).use(Feed)
+    const f = j.parse('<feed xmlns="http://www.w3.org/2005/Atom"/>') as AtomFeed
     assert.equal(f.format, 'atom')
     assert.equal(f.version, '1.0')
   })
 
   test('format=native preserves the dialect shape', () => {
-    const j = Jsonic.make().use(Feed, { format: 'native' })
-    const f: any = j('<rss version="2.0"><channel><title>x</title></channel></rss>')
+    const j = new Tabnas().use(jsonic).use(Feed, { format: 'native' })
+    const f: any = j.parse('<rss version="2.0"><channel><title>x</title></channel></rss>')
     assert.equal(f.format, 'rss')
     assert.equal(f.version, '2.0')
   })
@@ -56,8 +57,8 @@ describe('feed - plugin form', () => {
   test('parse runs cleanly when the input has trailing whitespace', () => {
     // bc on the xml rule fires twice in this case; the plugin must guard
     // against re-converting the already-converted result.
-    const j = Jsonic.make().use(Feed)
-    const f = j('<feed xmlns="http://www.w3.org/2005/Atom"><title>Hi</title></feed>\n  \n') as AtomFeed
+    const j = new Tabnas().use(jsonic).use(Feed)
+    const f = j.parse('<feed xmlns="http://www.w3.org/2005/Atom"><title>Hi</title></feed>\n  \n') as AtomFeed
     assert.equal(f.format, 'atom')
     assert.equal(f.title?.value, 'Hi')
   })

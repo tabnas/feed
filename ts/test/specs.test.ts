@@ -10,14 +10,15 @@ import assert from 'node:assert'
 import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { Jsonic } from '@tabnas/jsonic'
+import { Tabnas } from '@tabnas/parser'
+import { jsonic } from '@tabnas/jsonic'
 import { Feed, detect } from '../dist/feed.js'
 
 const SPECS_DIR = join(__dirname, '..', '..', 'test', 'specs')
 
-const atomParse = Jsonic.make().use(Feed)
-const nativeParse = Jsonic.make().use(Feed, { format: 'native' })
-const rawParse = Jsonic.make().use(Feed, { format: 'raw' })
+const atomParse = new Tabnas().use(jsonic).use(Feed)
+const nativeParse = new Tabnas().use(jsonic).use(Feed, { format: 'native' })
+const rawParse = new Tabnas().use(jsonic).use(Feed, { format: 'raw' })
 
 // canon JSON-roundtrips a value so deep-equal sees the same shape regardless
 // of property ordering or class identity.
@@ -45,7 +46,7 @@ describe('specs - dialect / version detection', () => {
     if (!existsSync(detectPath)) continue
     test(name, () => {
       const src = readFileSync(join(SPECS_DIR, name + '.xml'), 'utf8')
-      const root: any = rawParse(src)
+      const root: any = rawParse.parse(src)
       const got = detect(root)
       const want = JSON.parse(readFileSync(detectPath, 'utf8'))
       assert.deepEqual(canon(got), want)
@@ -60,7 +61,7 @@ describe('specs - atom (default) output', () => {
     if (!existsSync(expectedPath)) continue
     test(name, () => {
       const src = readFileSync(join(SPECS_DIR, name + '.xml'), 'utf8')
-      const got = atomParse(src)
+      const got = atomParse.parse(src)
       const want = JSON.parse(readFileSync(expectedPath, 'utf8'))
       assert.deepEqual(canon(got), want)
     })
@@ -74,7 +75,7 @@ describe('specs - native output', () => {
     if (!existsSync(expectedPath)) continue
     test(name, () => {
       const src = readFileSync(join(SPECS_DIR, name + '.xml'), 'utf8')
-      const got = nativeParse(src)
+      const got = nativeParse.parse(src)
       const want = JSON.parse(readFileSync(expectedPath, 'utf8'))
       assert.deepEqual(canon(got), want)
     })
