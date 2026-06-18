@@ -1,13 +1,13 @@
 // Copyright (c) 2021-2025 Richard Rodger and other contributors, MIT License
 
-package feed_test
+package tabnasfeed_test
 
 import (
 	"testing"
 	"time"
 
 	jsonic "github.com/tabnas/jsonic/go"
-	feed "github.com/tabnas/feed/go"
+	tabnasfeed "github.com/tabnas/feed/go"
 )
 
 // makeFeedParser builds a fresh Jsonic instance with the Feed plugin in the
@@ -15,13 +15,13 @@ import (
 // plugin and rebuilds the whole grammar, which dominates a parse.
 func makeFeedParser() *jsonic.Jsonic {
 	j := jsonic.Make()
-	_ = j.UseDefaults(feed.Feed, feed.Defaults)
+	_ = j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults)
 	return j
 }
 
 // TestParseReusesInstance guards against a performance regression. The feed
 // package has NO package-level convenience Parse(): callers instantiate the
-// plugin themselves (jsonic.Make() + UseDefaults(feed.Feed, ...)) and are
+// plugin themselves (jsonic.Make() + UseDefaults(tabnasfeed.Feed, ...)) and are
 // expected to REUSE that instance across parses. Building the instance
 // (xml plugin + grammar) dominates a parse, so rebuilding it on every parse
 // is many times slower than reusing one instance.

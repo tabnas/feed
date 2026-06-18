@@ -24,20 +24,20 @@ package main
 import (
     "fmt"
 
-    jsonic "github.com/tabnas/jsonic/go"
-    feed "github.com/tabnas/feed/go"
+    tabnasjsonic "github.com/tabnas/jsonic/go"
+    tabnasfeed "github.com/tabnas/feed/go"
 )
 
 func main() {
-    j := jsonic.Make()
-    if err := j.UseDefaults(feed.Feed, feed.Defaults); err != nil {
+    j := tabnasjsonic.Make()
+    if err := j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults); err != nil {
         panic(err)
     }
     got, err := j.Parse(`<rss version="2.0"><channel><title>My Blog</title></channel></rss>`)
     if err != nil {
         panic(err)
     }
-    f := got.(feed.AtomFeed)
+    f := got.(tabnasfeed.AtomFeed)
     fmt.Println(f.Title.Value) // My Blog
     fmt.Println(f.Format)      // atom
 }

@@ -1,6 +1,6 @@
 // Copyright (c) 2021-2025 Richard Rodger and other contributors, MIT License
 
-package feed_test
+package tabnasfeed_test
 
 import (
 	"encoding/json"
@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	jsonic "github.com/tabnas/jsonic/go"
-	feed "github.com/tabnas/feed/go"
+	tabnasfeed "github.com/tabnas/feed/go"
 	xml "github.com/tabnas/xml/go"
 )
 
@@ -79,7 +79,7 @@ func buildParser(t *testing.T, format string) *jsonic.Jsonic {
 	if format != "" {
 		opts["format"] = format
 	}
-	if err := j.UseDefaults(feed.Feed, feed.Defaults, opts); err != nil {
+	if err := j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults, opts); err != nil {
 		t.Fatalf("plugin init: %v", err)
 	}
 	return j
@@ -130,7 +130,7 @@ func TestSpecsDetect(t *testing.T) {
 			if err != nil {
 				t.Fatalf("parse xml: %v", err)
 			}
-			got := feed.Detect(root)
+			got := tabnasfeed.Detect(root)
 			want := readJSON(t, expectPath)
 			gotJSON := canon(t, got)
 			if !reflect.DeepEqual(gotJSON, want) {
@@ -255,7 +255,7 @@ func TestCorpusDetect(t *testing.T) {
 					fails = append(fails, fmt.Sprintf("%s: parse err %v", filepath.Base(path), err))
 					continue
 				}
-				got := feed.Detect(root)
+				got := tabnasfeed.Detect(root)
 				if got.Dialect != expect.dialect {
 					fails = append(fails, fmt.Sprintf("%s: dialect=%s", filepath.Base(path), got.Dialect))
 					continue
@@ -290,7 +290,7 @@ func TestCorpusParseAtom(t *testing.T) {
 					fails = append(fails, fmt.Sprintf("%s: %v", filepath.Base(path), err))
 					continue
 				}
-				if af, ok := got.(feed.AtomFeed); !ok || af.Format != "atom" {
+				if af, ok := got.(tabnasfeed.AtomFeed); !ok || af.Format != "atom" {
 					fails = append(fails, fmt.Sprintf("%s: bad shape %T", filepath.Base(path), got))
 				}
 			}
@@ -312,69 +312,69 @@ func TestCorpusTargets(t *testing.T) {
 
 	cases := []struct {
 		path  string
-		check func(t *testing.T, f feed.AtomFeed)
+		check func(t *testing.T, f tabnasfeed.AtomFeed)
 	}{
-		{"atom10/entry_title.xml", func(t *testing.T, f feed.AtomFeed) {
+		{"atom10/entry_title.xml", func(t *testing.T, f tabnasfeed.AtomFeed) {
 			if f.Entries[0].Title == nil || f.Entries[0].Title.Value != "Example Atom" {
 				t.Fatalf("got %+v", f.Entries[0].Title)
 			}
 		}},
-		{"atom10/entry_author_email.xml", func(t *testing.T, f feed.AtomFeed) {
+		{"atom10/entry_author_email.xml", func(t *testing.T, f tabnasfeed.AtomFeed) {
 			if f.Entries[0].Authors[0].Email != "me@example.com" {
 				t.Fatalf("got %q", f.Entries[0].Authors[0].Email)
 			}
 		}},
-		{"atom10/entry_author_name.xml", func(t *testing.T, f feed.AtomFeed) {
+		{"atom10/entry_author_name.xml", func(t *testing.T, f tabnasfeed.AtomFeed) {
 			if f.Entries[0].Authors[0].Name != "Example author" {
 				t.Fatalf("got %q", f.Entries[0].Authors[0].Name)
 			}
 		}},
-		{"atom10/entry_id.xml", func(t *testing.T, f feed.AtomFeed) {
+		{"atom10/entry_id.xml", func(t *testing.T, f tabnasfeed.AtomFeed) {
 			if f.Entries[0].ID == "" {
 				t.Fatalf("id missing")
 			}
 		}},
-		{"atom10/entry_link_href.xml", func(t *testing.T, f feed.AtomFeed) {
+		{"atom10/entry_link_href.xml", func(t *testing.T, f tabnasfeed.AtomFeed) {
 			if len(f.Entries[0].Links) == 0 || f.Entries[0].Links[0].Href == "" {
 				t.Fatalf("link missing")
 			}
 		}},
-		{"atom/entry_title.xml", func(t *testing.T, f feed.AtomFeed) {
+		{"atom/entry_title.xml", func(t *testing.T, f tabnasfeed.AtomFeed) {
 			if f.Entries[0].Title == nil || f.Entries[0].Title.Value == "" {
 				t.Fatalf("title missing")
 			}
 		}},
-		{"atom/entry_issued.xml", func(t *testing.T, f feed.AtomFeed) {
+		{"atom/entry_issued.xml", func(t *testing.T, f tabnasfeed.AtomFeed) {
 			if f.Entries[0].Published == "" {
 				t.Fatalf("published missing")
 			}
 		}},
-		{"atom/entry_modified.xml", func(t *testing.T, f feed.AtomFeed) {
+		{"atom/entry_modified.xml", func(t *testing.T, f tabnasfeed.AtomFeed) {
 			if f.Entries[0].Updated == "" {
 				t.Fatalf("updated missing")
 			}
 		}},
-		{"rss/channel_title.xml", func(t *testing.T, f feed.AtomFeed) {
+		{"rss/channel_title.xml", func(t *testing.T, f tabnasfeed.AtomFeed) {
 			if f.Title == nil || f.Title.Value != "Example feed" {
 				t.Fatalf("got %+v", f.Title)
 			}
 		}},
-		{"rss/item_title.xml", func(t *testing.T, f feed.AtomFeed) {
+		{"rss/item_title.xml", func(t *testing.T, f tabnasfeed.AtomFeed) {
 			if f.Entries[0].Title == nil || f.Entries[0].Title.Value != "Item 1 title" {
 				t.Fatalf("got %+v", f.Entries[0].Title)
 			}
 		}},
-		{"rss/item_link.xml", func(t *testing.T, f feed.AtomFeed) {
+		{"rss/item_link.xml", func(t *testing.T, f tabnasfeed.AtomFeed) {
 			if len(f.Entries[0].Links) == 0 {
 				t.Fatalf("links missing")
 			}
 		}},
-		{"rss/item_guid.xml", func(t *testing.T, f feed.AtomFeed) {
+		{"rss/item_guid.xml", func(t *testing.T, f tabnasfeed.AtomFeed) {
 			if f.Entries[0].ID == "" {
 				t.Fatalf("id missing")
 			}
 		}},
-		{"rss/item_enclosure_url.xml", func(t *testing.T, f feed.AtomFeed) {
+		{"rss/item_enclosure_url.xml", func(t *testing.T, f tabnasfeed.AtomFeed) {
 			var found bool
 			for _, l := range f.Entries[0].Links {
 				if l.Rel == "enclosure" {
@@ -386,22 +386,22 @@ func TestCorpusTargets(t *testing.T) {
 				t.Fatalf("enclosure link missing")
 			}
 		}},
-		{"rdf/rdf_channel_title.xml", func(t *testing.T, f feed.AtomFeed) {
+		{"rdf/rdf_channel_title.xml", func(t *testing.T, f tabnasfeed.AtomFeed) {
 			if f.Title == nil || f.Title.Value != "Example feed" {
 				t.Fatalf("got %+v", f.Title)
 			}
 		}},
-		{"rdf/rdf_item_title.xml", func(t *testing.T, f feed.AtomFeed) {
+		{"rdf/rdf_item_title.xml", func(t *testing.T, f tabnasfeed.AtomFeed) {
 			if f.Entries[0].Title == nil || f.Entries[0].Title.Value != "Example title" {
 				t.Fatalf("got %+v", f.Entries[0].Title)
 			}
 		}},
-		{"rdf/rss090_channel_title.xml", func(t *testing.T, f feed.AtomFeed) {
+		{"rdf/rss090_channel_title.xml", func(t *testing.T, f tabnasfeed.AtomFeed) {
 			if f.Title == nil || f.Title.Value != "Example title" {
 				t.Fatalf("got %+v", f.Title)
 			}
 		}},
-		{"rdf/rdf_item_rdf_about.xml", func(t *testing.T, f feed.AtomFeed) {
+		{"rdf/rdf_item_rdf_about.xml", func(t *testing.T, f tabnasfeed.AtomFeed) {
 			if f.Entries[0].ID != "http://example.org/1" {
 				t.Fatalf("got %q", f.Entries[0].ID)
 			}
@@ -420,7 +420,7 @@ func TestCorpusTargets(t *testing.T) {
 			if err != nil {
 				t.Fatalf("parse: %v", err)
 			}
-			af, ok := got.(feed.AtomFeed)
+			af, ok := got.(tabnasfeed.AtomFeed)
 			if !ok {
 				t.Fatalf("expected AtomFeed, got %T", got)
 			}

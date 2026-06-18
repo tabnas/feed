@@ -13,7 +13,7 @@ Import path: `github.com/tabnas/feed/go`, package name `feed`.
 
 | Symbol                                | Kind     | Description                                  |
 | ------------------------------------- | -------- | -------------------------------------------- |
-| `Feed(j *jsonic.Jsonic, opts map[string]any) error` | func | Plugin entry point; register with `UseDefaults`. |
+| `Feed(j *tabnasjsonic.Jsonic, opts map[string]any) error` | func | Plugin entry point; register with `UseDefaults`. |
 | `Defaults`                            | `map[string]any` | `{"format": "atom"}` — merged with caller options. |
 | `Detect(root any) Detection`          | func     | Report dialect/version of a raw XML root.    |
 | `Convert(root any, format string) (any, error)` | func | Turn a raw element tree into the requested shape. |
@@ -31,15 +31,15 @@ Public types: `Detection`, `AtomFeed`, `AtomEntry`, `AtomEntrySource`,
 with `UseDefaults`. Parsing is the instance's `Parse` method.
 
 ```go
-j := jsonic.Make()
-err := j.UseDefaults(feed.Feed, feed.Defaults, opts) // opts optional
+j := tabnasjsonic.Make()
+err := j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults, opts) // opts optional
 result, err := j.Parse(source)                        // (any, error)
 ```
 
 `UseDefaults` merges each supplied option map over the preceding ones
 (so `Defaults` first, then caller `opts`), giving caller options
 precedence. Pass no extra map for defaults-only. `Feed` calls
-`j.UseDefaults(xml.Xml, xml.Defaults)` internally, so the XML plugin is
+`j.UseDefaults(tabnasxml.Xml, tabnasxml.Defaults)` internally, so the XML plugin is
 installed for you — you still need `github.com/tabnas/xml/go` as a
 dependency. `Feed` is idempotent: it short-circuits if already applied
 to the instance.
@@ -57,9 +57,9 @@ var Defaults = map[string]any{"format": "atom"}
 ```
 
 - `"atom"` (default) — every dialect is normalised to a single
-  `feed.AtomFeed`.
+  `tabnasfeed.AtomFeed`.
 - `"native"` — the dialect-specific struct, with no cross-dialect
-  normalisation: `feed.AtomFeed`, `feed.Rss2Feed`, or `feed.Rss1Feed`.
+  normalisation: `tabnasfeed.AtomFeed`, `tabnasfeed.Rss2Feed`, or `tabnasfeed.Rss1Feed`.
 - `"raw"` — the underlying `map[string]any` element tree from the XML
   plugin, with no feed interpretation.
 
@@ -73,8 +73,8 @@ type behind the `any`:
 
 | `format`   | Concrete type returned by `Parse`                   |
 | ---------- | --------------------------------------------------- |
-| `"atom"`   | `feed.AtomFeed`                                     |
-| `"native"` | `feed.AtomFeed` / `feed.Rss2Feed` / `feed.Rss1Feed` |
+| `"atom"`   | `tabnasfeed.AtomFeed`                                     |
+| `"native"` | `tabnasfeed.AtomFeed` / `tabnasfeed.Rss2Feed` / `tabnasfeed.Rss1Feed` |
 | `"raw"`    | `map[string]any` (the XML element tree)             |
 
 For `"native"`, type-switch on the result (or assert when you know the
@@ -182,7 +182,7 @@ dereferencing.
 
 ## Native types
 
-Used only with `format: "native"`. See [`feed.go`](../feed.go) for the
+Used only with `format: "native"`. See [`tabnasfeed.go`](../tabnasfeed.go) for the
 full field lists; the headline shapes:
 
 ```go
