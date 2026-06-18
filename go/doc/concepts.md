@@ -19,7 +19,7 @@ the XML grammar from [`github.com/tabnas/xml/go`](https://github.com/tabnas/xml)
 
 When you register it, `Feed`:
 
-1. calls `j.UseDefaults(xml.Xml, xml.Defaults)` so the XML grammar is
+1. calls `j.UseDefaults(tabnasxml.Xml, tabnasxml.Defaults)` so the XML grammar is
    installed, and
 2. registers a **before-close** (`AddBC`) action on the existing `xml`
    rule.
@@ -124,11 +124,11 @@ shape and value representation, not behaviour.
 
 | Aspect          | TypeScript                                | Go                                              |
 | --------------- | ----------------------------------------- | ----------------------------------------------- |
-| Engine          | `new Tabnas().use(jsonic).use(Feed, opts)`| `j := jsonic.Make(); j.UseDefaults(feed.Feed, feed.Defaults, opts)` |
+| Engine          | `new Tabnas().use(jsonic).use(Feed, opts)`| `j := tabnasjsonic.Make(); j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults, opts)` |
 | Options value   | `{ format: 'native' }` (object)           | `map[string]any{"format": "native"}`            |
-| Defaults        | implicit (`format` defaults to `'atom'`)  | explicit `feed.Defaults` map you pass in        |
+| Defaults        | implicit (`format` defaults to `'atom'`)  | explicit `tabnasfeed.Defaults` map you pass in        |
 | Parse result    | `j.parse(src)` returns the value          | `j.Parse(src)` returns `(any, error)`           |
-| Errors          | `parse` **throws** a `JsonicError`        | `Parse` **returns** a `*jsonic.JsonicError`     |
+| Errors          | `parse` **throws** a `JsonicError`        | `Parse` **returns** a `*tabnasjsonic.JsonicError`     |
 
 In Go you must handle the returned `error`; there is no exception. The
 plugin signals a feed-level error by setting `ctx.ParseErr`, which

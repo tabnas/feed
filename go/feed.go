@@ -6,7 +6,7 @@
 // Atom-shaped result; pass options{"format": "native"} to keep the source
 // dialect's structure or options{"format": "raw"} to get back the raw XML
 // element tree from the xml plugin.
-package feed
+package tabnasfeed
 
 import (
 	"fmt"

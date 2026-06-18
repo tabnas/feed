@@ -37,10 +37,10 @@ feed.format   // 'atom'
 **Go** — the same, returning a typed struct:
 
 ```go
-j := jsonic.Make()
-j.UseDefaults(feed.Feed, feed.Defaults)
+j := tabnasjsonic.Make()
+j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults)
 got, _ := j.Parse(`<rss version="2.0"><channel><title>My Blog</title></channel></rss>`)
-f := got.(feed.AtomFeed)
+f := got.(tabnasfeed.AtomFeed)
 fmt.Println(f.Title.Value) // My Blog
 ```
 

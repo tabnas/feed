@@ -10,33 +10,33 @@ registered:
 
 ```go
 import (
-    jsonic "github.com/tabnas/jsonic/go"
-    feed "github.com/tabnas/feed/go"
+    tabnasjsonic "github.com/tabnas/jsonic/go"
+    tabnasfeed "github.com/tabnas/feed/go"
 )
 
-j := jsonic.Make()
-j.UseDefaults(feed.Feed, feed.Defaults)
+j := tabnasjsonic.Make()
+j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults)
 ```
 
 ## Use it as a plugin
 
-Register `feed.Feed` with `feed.Defaults` via `UseDefaults`. The plugin
+Register `tabnasfeed.Feed` with `tabnasfeed.Defaults` via `UseDefaults`. The plugin
 pulls in `github.com/tabnas/xml/go` for you, so you do not register the
 XML plugin yourself. Then `Parse` any feed source:
 
 ```go
-j := jsonic.Make()
-if err := j.UseDefaults(feed.Feed, feed.Defaults); err != nil {
+j := tabnasjsonic.Make()
+if err := j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults); err != nil {
     panic(err)
 }
 got, err := j.Parse(`<rss version="2.0"><channel><title>x</title></channel></rss>`)
 if err != nil {
     panic(err)
 }
-f := got.(feed.AtomFeed) // f.Format == "atom", f.Version == "1.0"
+f := got.(tabnasfeed.AtomFeed) // f.Format == "atom", f.Version == "1.0"
 ```
 
-`UseDefaults` merges any extra option map over `feed.Defaults`, so
+`UseDefaults` merges any extra option map over `tabnasfeed.Defaults`, so
 caller options override defaults. The instance is reusable.
 
 ## Keep the source dialect's structure
@@ -47,10 +47,10 @@ fields like `TTL`, `Cloud`, or `SkipDays`, register with
 `format: "native"`:
 
 ```go
-j := jsonic.Make()
-j.UseDefaults(feed.Feed, feed.Defaults, map[string]any{"format": "native"})
+j := tabnasjsonic.Make()
+j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults, map[string]any{"format": "native"})
 got, _ := j.Parse(rssSource)
-native := got.(feed.Rss2Feed)
+native := got.(tabnasfeed.Rss2Feed)
 // native.TTL, native.Cloud, native.SkipDays
 ```
 
@@ -58,19 +58,19 @@ The native concrete type depends on the input dialect:
 
 | Input dialect         | Type assertion target |
 | --------------------- | --------------------- |
-| Atom 1.0 / 0.3        | `feed.AtomFeed`       |
-| RSS 2.0 / 0.92 / 0.91 | `feed.Rss2Feed`       |
-| RSS 1.0 / 0.90        | `feed.Rss1Feed`       |
+| Atom 1.0 / 0.3        | `tabnasfeed.AtomFeed`       |
+| RSS 2.0 / 0.92 / 0.91 | `tabnasfeed.Rss2Feed`       |
+| RSS 1.0 / 0.90        | `tabnasfeed.Rss1Feed`       |
 
 When the dialect is not known up front, switch on the result type:
 
 ```go
 switch v := got.(type) {
-case feed.AtomFeed:
+case tabnasfeed.AtomFeed:
     // v.Format == "atom"
-case feed.Rss2Feed:
+case tabnasfeed.Rss2Feed:
     // v.Format == "rss"
-case feed.Rss1Feed:
+case tabnasfeed.Rss1Feed:
     // v.Format == "rdf"
 }
 ```
@@ -82,8 +82,8 @@ non-standard namespace extension like `<media:content>` — drop down to
 the raw element tree from the XML plugin with `format: "raw"`:
 
 ```go
-j := jsonic.Make()
-j.UseDefaults(feed.Feed, feed.Defaults, map[string]any{"format": "raw"})
+j := tabnasjsonic.Make()
+j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults, map[string]any{"format": "raw"})
 got, _ := j.Parse(`<rss version="2.0"><channel><title>x</title></channel></rss>`)
 tree := got.(map[string]any)
 // tree["localName"] == "rss"
@@ -97,39 +97,39 @@ strings for text and nested element maps).
 
 ## Detect a feed's dialect without converting
 
-`feed.Detect` reports the dialect and version of a raw XML root. Parse
+`tabnasfeed.Detect` reports the dialect and version of a raw XML root. Parse
 with `format: "raw"`, then call it:
 
 ```go
-j := jsonic.Make()
-j.UseDefaults(feed.Feed, feed.Defaults, map[string]any{"format": "raw"})
+j := tabnasjsonic.Make()
+j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults, map[string]any{"format": "raw"})
 got, _ := j.Parse(`<rss version="2.0"><channel><title>x</title></channel></rss>`)
 
-det := feed.Detect(got)
-// det == feed.Detection{Dialect: "rss", Version: "rss20"}
+det := tabnasfeed.Detect(got)
+// det == tabnasfeed.Detection{Dialect: "rss", Version: "rss20"}
 ```
 
 `Detect` never returns an error; an unrecognised root gives
-`feed.Detection{Dialect: "unknown", Version: "unknown"}`.
+`tabnasfeed.Detection{Dialect: "unknown", Version: "unknown"}`.
 
 ## Convert a tree you already have
 
-If you obtained a raw element tree some other way, call `feed.Convert`
+If you obtained a raw element tree some other way, call `tabnasfeed.Convert`
 directly — it is what the plugin runs internally:
 
 ```go
-out, err := feed.Convert(rawTree, "atom") // or "native" / "raw"
+out, err := tabnasfeed.Convert(rawTree, "atom") // or "native" / "raw"
 if err != nil {
     // e.g. unrecognized root element
 }
-f := out.(feed.AtomFeed)
+f := out.(tabnasfeed.AtomFeed)
 ```
 
 ## Handle parse errors
 
 `Parse` returns a non-nil `error` for both XML-level failures
 (unterminated tag, mismatched close) and feed-level failures
-(unrecognised root). The concrete type is `*jsonic.JsonicError`, which
+(unrecognised root). The concrete type is `*tabnasjsonic.JsonicError`, which
 carries a `Code` and a formatted message with source context:
 
 ```go
@@ -137,7 +137,7 @@ import "errors"
 
 got, err := j.Parse(src)
 if err != nil {
-    var je *jsonic.JsonicError
+    var je *tabnasjsonic.JsonicError
     if errors.As(err, &je) {
         // je.Code, je.Error() — structured, with row/col and a snippet
         log.Printf("feed parse failed: %v", je)

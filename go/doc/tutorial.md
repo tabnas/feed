@@ -31,13 +31,13 @@ package main
 import (
     "fmt"
 
-    jsonic "github.com/tabnas/jsonic/go"
-    feed "github.com/tabnas/feed/go"
+    tabnasjsonic "github.com/tabnas/jsonic/go"
+    tabnasfeed "github.com/tabnas/feed/go"
 )
 
 func main() {
-    j := jsonic.Make()
-    if err := j.UseDefaults(feed.Feed, feed.Defaults); err != nil {
+    j := tabnasjsonic.Make()
+    if err := j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults); err != nil {
         panic(err)
     }
 
@@ -58,7 +58,7 @@ func main() {
         panic(err)
     }
 
-    f := got.(feed.AtomFeed)
+    f := got.(tabnasfeed.AtomFeed)
     fmt.Println(f.Title.Value)          // My Blog
     fmt.Println(f.Entries[0].ID)        // https://example.com/1
     fmt.Println(f.Entries[0].Links[0])  // {https://example.com/1 alternate    0}
@@ -73,14 +73,14 @@ the rest of your code never branches on the source format.
 
 Notice three things in the output:
 
-- `f.Title` is an `*feed.AtomText` — it carries a content type
+- `f.Title` is an `*tabnasfeed.AtomText` — it carries a content type
   (`Type: "text"`) alongside its `Value`, not a bare string.
 - The RSS `<guid>` became `f.Entries[0].ID`.
 - The RSS `<link>` became an `AtomLink` with `Rel: "alternate"`.
 
 `Parse` returns `(any, error)`. Type-assert the result to the concrete
 type for the format you chose — with the default `format`, that is
-`feed.AtomFeed`.
+`tabnasfeed.AtomFeed`.
 
 ## 4. Parse a different dialect — same struct out
 
@@ -97,7 +97,7 @@ got, _ := j.Parse(`
     </entry>
   </feed>`)
 
-f := got.(feed.AtomFeed)
+f := got.(tabnasfeed.AtomFeed)
 fmt.Println(f.Title.Value)             // Example Feed
 fmt.Println(f.Entries[0].Content.Type)  // html
 fmt.Println(f.Entries[0].Content.Value) // <p>hi</p>
@@ -110,7 +110,7 @@ know not to trust it as plain text.
 ## 5. Handle an error
 
 If the root element is not a feed the plugin recognises, `Parse`
-returns a non-nil error (a `*jsonic.JsonicError`). Check it like any
+returns a non-nil error (a `*tabnasjsonic.JsonicError`). Check it like any
 other Go error:
 
 ```go
