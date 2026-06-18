@@ -18,7 +18,7 @@ import (
 	xml "github.com/tabnas/xml/go"
 )
 
-const Version = "0.1.0"
+const Version = "0.2.0"
 
 // Defaults are merged with caller-supplied options when the plugin is
 // registered via jsonic.UseDefaults. The single supported option is
