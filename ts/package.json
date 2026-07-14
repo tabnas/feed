@@ -1,6 +1,6 @@
 {
   "name": "@tabnas/feed",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Parses RSS (0.90, 0.91, 0.92, 1.0, 2.0) and Atom (0.3, 1.0) feeds into a typed structure, defaulting to a normalized Atom shape.",
   "author": "Richard Rodger (http://richardrodger.com)",
   "license": "MIT",
