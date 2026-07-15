@@ -1,5 +1,12 @@
 # @tabnas/feed
 
+<!-- tabnas-badges -->
+[![npm](https://tabnas.github.io/status/badges/feed-npm.svg)](https://www.npmjs.com/package/@tabnas/feed)
+[![CI](https://github.com/tabnas/feed/actions/workflows/ci.yml/badge.svg)](https://github.com/tabnas/feed/actions/workflows/ci.yml)
+[![go](https://tabnas.github.io/status/badges/feed-go.svg)](https://pkg.go.dev/github.com/tabnas/feed/go)
+[![tabnas standard](https://tabnas.github.io/status/badges/feed-standard.svg)](https://tabnas.github.io/status/)
+<!-- /tabnas-badges -->
+
 Parses RSS (0.90, 0.91, 0.92, 1.0, 2.0) and Atom (0.3, 1.0) syndication
 feeds into a typed structure. By default every dialect is normalised to
 a single **Atom-shaped** result, so the same downstream code can consume
