@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	jsonic "github.com/tabnas/jsonic/go"
 	tabnasfeed "github.com/tabnas/feed/go"
+	jsonic "github.com/tabnas/jsonic/go"
 )
 
 // makeFeedParser builds a fresh Jsonic instance with the Feed plugin in the

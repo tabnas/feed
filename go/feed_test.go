@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	jsonic "github.com/tabnas/jsonic/go"
 	tabnasfeed "github.com/tabnas/feed/go"
+	jsonic "github.com/tabnas/jsonic/go"
 	xml "github.com/tabnas/xml/go"
 )
 
@@ -108,7 +108,6 @@ func listSpecs(t *testing.T) []string {
 	return names
 }
 
-
 func TestSpecsDetect(t *testing.T) {
 	names := listSpecs(t)
 	if len(names) == 0 {
@@ -197,7 +196,6 @@ func TestSpecsNative(t *testing.T) {
 		})
 	}
 }
-
 
 // --- feedparser-wellformed corpus -----------------------------------------
 
@@ -300,7 +298,6 @@ func TestCorpusParseAtom(t *testing.T) {
 		})
 	}
 }
-
 
 // --- targeted value checks (from feedparser comments) ---------------------
 
@@ -428,7 +425,6 @@ func TestCorpusTargets(t *testing.T) {
 		})
 	}
 }
-
 
 func TestErrorOnUnknownRoot(t *testing.T) {
 	atomParse := buildParser(t, "atom")
