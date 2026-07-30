@@ -8,7 +8,7 @@ Go structs. By default every dialect is normalised to an Atom-shaped
 result, so the same downstream code can consume feeds from any source.
 
 The output JSON shape matches the TypeScript implementation exactly
-(both pass the shared [`../test/specs/`](../test/specs/) fixtures).
+(both pass the shared [`../test/spec/`](../test/spec/) fixtures).
 
 ## Install
 
@@ -70,7 +70,7 @@ side; the TypeScript implementation is in [`../ts/`](../ts/).
 go test ./...
 ```
 
-Runs the cross-language fixtures in [`../test/specs/`](../test/specs/)
+Runs the shared `.tsv` fixtures in [`../test/spec/`](../test/spec/)
 and the vendored well-formed corpus in
 [`../test/feedparser-wellformed/`](../test/feedparser-wellformed/).
 

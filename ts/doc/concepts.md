@@ -119,7 +119,7 @@ guard, the already-converted result would be fed back through
 ## Cross-language parity through shared fixtures
 
 The TypeScript and Go implementations are kept in lockstep through
-[`test/specs/`](../../test/specs/): each `<name>.xml` ships with a
+[`test/spec/`](../../test/spec/): each row is a feed document plus a
 `<name>.detect.json`, a `<name>.atom.json`, and an optional
 `<name>.native.json`. Both test suites enumerate the directory, parse
 each input, and JSON-deep-compare the result against the expectation

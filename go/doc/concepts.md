@@ -105,7 +105,7 @@ once, on the iteration that produced the element.
 The Go structs carry JSON tags chosen so that `json.Marshal(result)`
 produces the same shape the TypeScript parser produces with
 `JSON.stringify`. This is what makes the shared fixtures in
-[`../../test/specs/`](../../test/specs/) work for both languages: each
+[`../../test/spec/`](../../test/spec/) work for both languages: each
 test JSON-marshal-unmarshals the parser output and deep-compares it to
 the language-agnostic expected `*.atom.json` / `*.native.json`. The
 vendored well-formed corpus in
@@ -157,7 +157,7 @@ package version.
 ### Known accepted differences
 
 There are no known behavioural differences in the parsed output: both
-languages pass the same `test/specs/` fixtures after a JSON round-trip.
+languages pass the same `test/spec/*.tsv` fixtures after a JSON round-trip.
 The only differences are idiomatic-Go surface choices listed above
 (pointers vs. optional fields, `(any, error)` vs. throw, `map[string]any`
 vs. `XmlElement`).

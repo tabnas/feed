@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -17,17 +16,6 @@ import (
 	xml "github.com/tabnas/xml/go"
 )
 
-// specsDir resolves test/specs from the package directory.
-func specsDir(t *testing.T) string {
-	t.Helper()
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	// go/ -> repo root
-	return filepath.Join(wd, "..", "test", "specs")
-}
-
 // wellformedDir resolves test/feedparser-wellformed.
 func wellformedDir(t *testing.T) string {
 	t.Helper()
@@ -36,22 +24,6 @@ func wellformedDir(t *testing.T) string {
 		t.Fatalf("getwd: %v", err)
 	}
 	return filepath.Join(wd, "..", "test", "feedparser-wellformed")
-}
-
-// readJSON loads and parses a JSON file into an `any`. Used to canonicalise
-// expected and actual structures so deep-equal compares them by shape, not
-// by Go-typed-vs-decoded details.
-func readJSON(t *testing.T, path string) any {
-	t.Helper()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read %s: %v", path, err)
-	}
-	var v any
-	if err := json.Unmarshal(data, &v); err != nil {
-		t.Fatalf("parse %s: %v", path, err)
-	}
-	return v
 }
 
 // canon marshals a Go value via JSON and unmarshals it back to `any` so
@@ -85,117 +57,9 @@ func buildParser(t *testing.T, format string) *jsonic.Jsonic {
 	return j
 }
 
-// listSpecs returns base names (without extension) of all .xml fixtures
-// in test/specs/.
-func listSpecs(t *testing.T) []string {
-	t.Helper()
-	dir := specsDir(t)
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatalf("read specs dir %s: %v", dir, err)
-	}
-	var names []string
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		n := e.Name()
-		if strings.HasSuffix(n, ".xml") {
-			names = append(names, strings.TrimSuffix(n, ".xml"))
-		}
-	}
-	sort.Strings(names)
-	return names
-}
-
-func TestSpecsDetect(t *testing.T) {
-	names := listSpecs(t)
-	if len(names) == 0 {
-		t.Fatalf("no specs found")
-	}
-	rawParse := buildParser(t, "raw")
-	for _, name := range names {
-		name := name
-		t.Run(name, func(t *testing.T) {
-			expectPath := filepath.Join(specsDir(t), name+".detect.json")
-			if _, err := os.Stat(expectPath); err != nil {
-				t.Skipf("no .detect.json for %s", name)
-			}
-			src, err := os.ReadFile(filepath.Join(specsDir(t), name+".xml"))
-			if err != nil {
-				t.Fatalf("read xml: %v", err)
-			}
-			root, err := rawParse.Parse(string(src))
-			if err != nil {
-				t.Fatalf("parse xml: %v", err)
-			}
-			got := tabnasfeed.Detect(root)
-			want := readJSON(t, expectPath)
-			gotJSON := canon(t, got)
-			if !reflect.DeepEqual(gotJSON, want) {
-				t.Fatalf("detect mismatch:\n  got:  %v\n  want: %v", gotJSON, want)
-			}
-		})
-	}
-}
-
-func TestSpecsAtom(t *testing.T) {
-	names := listSpecs(t)
-	atomParse := buildParser(t, "atom")
-	for _, name := range names {
-		name := name
-		t.Run(name, func(t *testing.T) {
-			expectPath := filepath.Join(specsDir(t), name+".atom.json")
-			if _, err := os.Stat(expectPath); err != nil {
-				t.Skipf("no .atom.json for %s", name)
-			}
-			src, err := os.ReadFile(filepath.Join(specsDir(t), name+".xml"))
-			if err != nil {
-				t.Fatalf("read xml: %v", err)
-			}
-			got, err := atomParse.Parse(string(src))
-			if err != nil {
-				t.Fatalf("parse: %v", err)
-			}
-			gotJSON := canon(t, got)
-			want := readJSON(t, expectPath)
-			if !reflect.DeepEqual(gotJSON, want) {
-				gj, _ := json.MarshalIndent(gotJSON, "", "  ")
-				wj, _ := json.MarshalIndent(want, "", "  ")
-				t.Fatalf("atom mismatch for %s:\n--- got ---\n%s\n--- want ---\n%s", name, gj, wj)
-			}
-		})
-	}
-}
-
-func TestSpecsNative(t *testing.T) {
-	names := listSpecs(t)
-	nativeParse := buildParser(t, "native")
-	for _, name := range names {
-		name := name
-		t.Run(name, func(t *testing.T) {
-			expectPath := filepath.Join(specsDir(t), name+".native.json")
-			if _, err := os.Stat(expectPath); err != nil {
-				t.Skipf("no .native.json for %s", name)
-			}
-			src, err := os.ReadFile(filepath.Join(specsDir(t), name+".xml"))
-			if err != nil {
-				t.Fatalf("read xml: %v", err)
-			}
-			got, err := nativeParse.Parse(string(src))
-			if err != nil {
-				t.Fatalf("parse: %v", err)
-			}
-			gotJSON := canon(t, got)
-			want := readJSON(t, expectPath)
-			if !reflect.DeepEqual(gotJSON, want) {
-				gj, _ := json.MarshalIndent(gotJSON, "", "  ")
-				wj, _ := json.MarshalIndent(want, "", "  ")
-				t.Fatalf("native mismatch for %s:\n--- got ---\n%s\n--- want ---\n%s", name, gj, wj)
-			}
-		})
-	}
-}
+// The dialect/atom/native fixtures these three tests used to enumerate now
+// live as TSV rows under test/spec, run by parity_test.go here and by
+// ts/test/parity.test.ts — one mechanism instead of two. See test/AGENTS.md.
 
 // --- feedparser-wellformed corpus -----------------------------------------
 

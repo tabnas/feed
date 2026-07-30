@@ -2,7 +2,7 @@
 
 // TS-only behaviour checks: error paths, the `raw` output mode, and the
 // shape of the plugin registration. The bulk of dialect-by-dialect
-// expectations lives in test/specs/ (driven by both this language and
+// expectations lives in test/spec/*.tsv (driven by both this language and
 // the Go test suite).
 
 import { test, describe } from 'node:test'

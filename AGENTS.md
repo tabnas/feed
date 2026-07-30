@@ -29,7 +29,7 @@ exported for callers working with `raw` output.
 |---|---|
 | [`ts/`](ts/) | **Canonical** TypeScript implementation — the `@tabnas/feed` package. Everything lives in `src/feed.ts` (plugin + types + helpers). No CLI. |
 | [`go/`](go/) | Go port — module `github.com/tabnas/feed/go`. Plugin + helpers in `go/feed.go`; top-level `const Version` mirrors `ts/package.json`. |
-| [`test/specs/`](test/specs/) | Cross-language fixtures: per base name, `<name>.xml` plus `<name>.atom.json` / `<name>.native.json` / `<name>.detect.json` (the last two optional). Both runtimes enumerate this dir. See `test/specs/README.md`. |
+| [`test/spec/`](test/spec/) | Shared `.tsv` conformance fixtures. Both runtimes auto-discover this dir; the header row's second column name selects what is compared (`expected` = the parse result, `detect` = the dialect report). See [`test/AGENTS.md`](test/AGENTS.md). |
 | [`test/feedparser-wellformed/`](test/feedparser-wellformed/) | Vendored well-formed feed corpus from kurtmckee/feedparser (BSD 2-Clause), in `atom10/` `atom/` `rss/` `rdf/` subdirs. Both runtimes parse these and assert detection. See `THIRD_PARTY_NOTICES.md`. |
 | [`ts/doc/grammar.svg`](ts/doc/grammar.svg) / `grammar.txt` | Railroad diagram of the (xml) grammar, regenerated with `@tabnas/railroad`. |
 
@@ -70,7 +70,7 @@ Feed: the feed plugin pulls in Xml, and Xml/feed expect jsonic's lexer.
 1. **TypeScript is canonical.** When TS and Go disagree on parse or
    normalization behavior, TS wins; change Go to match, and add or extend
    a shared fixture when the behavior is expressible as input → output.
-2. The shared fixtures in `test/specs/*` are the **parity contract**.
+2. The shared fixtures in `test/spec/*.tsv` are the **parity contract**.
    Both suites enumerate the directory, parse each `.xml` with the
    matching `format` option, and deep-equal the result against the
    expected JSON after a JSON marshal/unmarshal round-trip (which
@@ -132,7 +132,7 @@ Go (module in `go/`):
 
 ```bash
 cd go && go build ./...
-cd go && go test -v ./...               # runs test/specs + feedparser-wellformed
+cd go && go test -v ./...               # runs test/spec + feedparser-wellformed
 ```
 
 Or via the top-level `Makefile` (ts canonical, go tracks it):
@@ -148,8 +148,8 @@ tags `go/vX.Y.Z`, and (when `gh` is present) cuts a release.
 
 ## Tests
 
-- `ts/test/specs.test.ts` / `go/feed_test.go` drive the shared
-  `test/specs/` fixtures across the three formats (`atom`, `native`, plus
+- `ts/test/parity.test.ts` / `go/parity_test.go` drive the shared
+  `test/spec/*.tsv` fixtures across the three formats (`atom`, `native`, plus
   `detect`).
 - `ts/test/feedparser.test.ts` / the Go equivalent run the vendored
   `test/feedparser-wellformed/` corpus and assert dialect/version

@@ -1,0 +1,2 @@
+input	expected	opts
+<not-a-feed/>	ERROR:unrecognized root
