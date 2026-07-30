@@ -99,9 +99,14 @@ function runSpec(file: string) {
         const parsed = tn.parse(row.input)
         const value = 'detect' === mode ? detect(parsed as any) : parsed
 
+        // A fixture that says `null` must not be satisfied by a parse that
+        // produced nothing: the two are different results.
+        assert.notStrictEqual(value, undefined,
+          `${file}:${row.line}: no value; expected ${row.expected}`)
+
         // Round-trip through JSON so class identity and property order do not
         // affect the structural comparison.
-        const got = JSON.parse(JSON.stringify(value ?? null))
+        const got = JSON.parse(JSON.stringify(value))
         assert.deepStrictEqual(got, JSON.parse(row.expected),
           `${file}:${row.line}`)
       })
