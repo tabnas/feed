@@ -13,7 +13,7 @@
 // Idempotent: a corpus already at the pinned SHA is left alone.
 
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, mkdirSync, cpSync, copyFileSync, existsSync, readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs'
+import { mkdtempSync, rmSync, mkdirSync, cpSync, copyFileSync, existsSync, readFileSync, writeFileSync, readdirSync } from 'node:fs'
 import { join, dirname, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
