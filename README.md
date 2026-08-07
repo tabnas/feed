@@ -78,7 +78,7 @@ Language hubs: [`ts/README.md`](ts/README.md) and
 | [`ts/`](ts/)                                                   | Canonical TypeScript / JavaScript implementation. |
 | [`go/`](go/)                                                   | Go port (`github.com/tabnas/feed/go`).       |
 | [`test/spec/`](test/spec/)                                    | Shared `.tsv` conformance fixtures, run by both runtimes. |
-| [`test/feedparser-wellformed/`](test/feedparser-wellformed/)  | Vendored well-formed corpus (BSD 2-Clause).  |
+| [`scripts/`](scripts/)                                        | Fetch the third-party conformance corpora (kurtmckee/feedparser, rubys/feedvalidator) at pinned commits. The corpora are never committed. |
 
 ## Grammar diagram
 

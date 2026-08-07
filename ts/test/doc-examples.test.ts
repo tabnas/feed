@@ -164,6 +164,7 @@ function makeRequire() {
 describe('doc-examples', () => {
   const files = collectMarkdown()
   let testable = 0
+  const dropped = []
 
   for (const file of files) {
     const rel = path.relative(REPO, file)
@@ -173,7 +174,13 @@ describe('doc-examples', () => {
       const joined = b.code.join('\n')
       if (!ARROW.test(joined)) return // no assertions -> skip
       const { code, count } = rewriteAssertions(importsToRequire(joined))
-      if (count === 0) return
+      if (count === 0) {
+        // The block carries `// =>` but produced no assertion. That is a
+        // silently-dropped expectation, so record it and fail below rather
+        // than skipping it.
+        dropped.push(`${rel} block #${bi + 1} (line ${b.startLine})`)
+        return
+      }
       testable++
       const label = `${rel} block #${bi + 1} (line ${b.startLine})`
       it(label, () => {
@@ -185,8 +192,13 @@ describe('doc-examples', () => {
     })
   }
 
-  it('found at least one tested example (sanity)', () => {
-    // Not a hard failure if a repo has no `// =>` examples yet.
-    assert.ok(testable >= 0, `tested ${testable} doc example block(s)`)
+  // This used to assert `testable >= 0`, which is true for every possible
+  // value — the extraction could break completely and the suite would still
+  // be green. It now requires that examples were actually found and run, and
+  // that no `// =>` expectation was silently dropped.
+  it('doc examples were actually extracted and asserted', () => {
+    assert.ok(0 < testable, `tested ${testable} doc example block(s); expected at least one`)
+    assert.deepStrictEqual(dropped, [],
+      `blocks with \`// =>\` that produced no assertion:\n  ${dropped.join('\n  ')}`)
   })
 })

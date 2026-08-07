@@ -72,7 +72,8 @@ go test ./...
 
 Runs the shared `.tsv` fixtures in [`../test/spec/`](../test/spec/)
 and the vendored well-formed corpus in
-[`../test/feedparser-wellformed/`](../test/feedparser-wellformed/).
+the fetched kurtmckee/feedparser corpus at `../test/feedparser/`
+(see `../scripts/fetch-feedparser.sh`; it is not committed).
 
 ## License
 

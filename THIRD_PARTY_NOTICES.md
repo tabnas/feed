@@ -3,13 +3,28 @@
 This project incorporates material from the projects listed below. The
 original copyright notices and license texts are preserved as required.
 
+> **Nothing in this section is vendored.** Both corpora below are FETCHED at
+> a pinned commit by `scripts/fetch-corpus.mjs` (via
+> `scripts/fetch-feedparser.sh` / `scripts/fetch-feedvalidator.sh`) into
+> gitignored directories. This repository redistributes no third-party test
+> corpus; only the fetch script and the pinned SHAs are tracked.
+
+## rubys/feedvalidator
+
+The test corpus behind the W3C Feed Validation Service. Fetched in full
+(`testcases/`) to `test/feedvalidator/`, pinned at commit
+`2a8050b950594464b3923af249623b614774c138`. The upstream licence file is
+fetched alongside it to `test/feedvalidator/LICENSE`.
+
+- Project: https://github.com/rubys/feedvalidator
+- Copyright (c) Sam Ruby and Mark Pilgrim
+
 ## kurtmckee/feedparser
 
-A focused subset of well-formed feed samples (`atom10`, `atom`, `rss`,
-`rdf`) from `tests/wellformed/` of the upstream `kurtmckee/feedparser`
-project is vendored at `test/feedparser-wellformed/`. The upstream
-`LICENSE` is preserved in place at
-`test/feedparser-wellformed/LICENSE`.
+The upstream `tests/wellformed/` and `tests/illformed/` trees are fetched
+to `test/feedparser/`, pinned at commit
+`a22c5521cbb109871f1a2318948581901bd47e26`. The upstream `LICENSE` is
+fetched alongside them to `test/feedparser/LICENSE`.
 
 - Project: https://github.com/kurtmckee/feedparser
 - License: BSD 2-Clause "Simplified" License

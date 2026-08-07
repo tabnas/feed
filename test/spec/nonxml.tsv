@@ -1,0 +1,20 @@
+input	expected	opts
+# Inputs that are not XML at all. The documented stack is
+# `new Tabnas().use(jsonic).use(Feed)`, so the obvious worry is that jsonic's
+# own JSON/JSONIC leniency leaks through and makes `{a:1}` parse. It does not
+# parse -- but neither is it rejected.
+#
+# As of the conformance-2026-08 baseline BOTH runtimes silently ACCEPT every
+# row: TS returns `undefined`, Go returns `nil`, neither raises. So all six
+# rows are RED in both, which is the honest reading -- a feed parser handed
+# `hello` must not report success. `new Tabnas().use(Feed)` (no jsonic) and
+# `new Tabnas().use(jsonic).use(Xml)` behave identically, so this is engine /
+# @tabnas/xml leniency reaching through the plugin, not a jsonic leak.
+#
+# Leave these RED until the parser rejects them; do not delete them.
+{a:1}	ERROR
+{"a":1}	ERROR
+[1,2,3]	ERROR
+a:1	ERROR
+1	ERROR
+hello	ERROR

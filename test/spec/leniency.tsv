@@ -1,0 +1,29 @@
+input	expected	opts
+# XML well-formedness cases that the documented stack currently ACCEPTS.
+# Every row here is a document that XML 1.0 forbids, so every row expects an
+# ERROR. They are RED as of the conformance-2026-08 baseline and are meant to
+# stay red until the leniency is fixed -- do NOT delete or loosen them to get
+# green (see the top-level AGENTS.md rule on honest tests).
+#
+# Cause: the base tabnas engine's own leniency (character data / line
+# comments outside the document element) reaches through @tabnas/xml into
+# this plugin. It is NOT introduced by `use(jsonic)`: `new Tabnas().use(Feed)`
+# classifies every one of these identically.
+#
+# 1. Content after the document element. XML 1.0 s2.1: only Misc (comments,
+#    PIs, whitespace) may follow the root. Anything else is a fatal error.
+<feed xmlns="http://www.w3.org/2005/Atom"><title>x</title></feed> trailing	ERROR
+<rss version="2.0"><channel/></rss>garbage	ERROR
+<feed xmlns="http://www.w3.org/2005/Atom"/>}	ERROR
+<feed xmlns="http://www.w3.org/2005/Atom"/>,	ERROR
+# 2. Engine line/block comment syntax before the document element. `#`, `//`
+#    and `/* */` are jsonic/tabnas comment forms, not XML prolog Misc.
+# c\n<feed xmlns="http://www.w3.org/2005/Atom"/>	ERROR
+// c\n<feed xmlns="http://www.w3.org/2005/Atom"/>	ERROR
+/* c */<feed xmlns="http://www.w3.org/2005/Atom"/>	ERROR
+# 3. Engine line comment after the document element.
+<feed xmlns="http://www.w3.org/2005/Atom"/>// x	ERROR
+<feed xmlns="http://www.w3.org/2005/Atom"/>\n# x	ERROR
+# 4. A second XML declaration. XML 1.0 s2.6 reserves the `xml` PI target; a
+#    declaration is only legal as the very first thing in the document.
+<?xml version="1.0"?><?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"/>	ERROR

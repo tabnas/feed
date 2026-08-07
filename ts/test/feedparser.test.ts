@@ -1,247 +1,224 @@
-/* Copyright (c) 2021-2025 Richard Rodger and other contributors, MIT License */
+/* Copyright (c) 2021-2026 Richard Rodger and other contributors, MIT License */
 
-// Uses well-formed feed samples vendored from kurtmckee/feedparser
-// (Copyright (C) 2010-2025 Kurt McKee, 2002-2008 Mark Pilgrim, BSD 2-Clause)
-// at test/feedparser-wellformed/. The upstream LICENSE is preserved alongside;
-// see THIRD_PARTY_NOTICES.md.
+// Conformance against the kurtmckee/feedparser corpus.
+//
+//   upstream: https://github.com/kurtmckee/feedparser  (BSD 2-Clause)
+//   pinned:   a22c5521cbb109871f1a2318948581901bd47e26
+//   fetch:    ./scripts/fetch-feedparser.sh   (NOT committed to this repo)
+//
+// Three halves, all of which must run:
+//
+//   1. tests/wellformed/  -> must PARSE.
+//   2. tests/wellformed/  -> must produce the VALUE the upstream `Expect:`
+//                            annotation states. Asserting only "it didn't
+//                            throw" is worthless; see ./expect-eval.ts for
+//                            the evaluator and its documented limits.
+//   3. tests/illformed/   -> must be REJECTED.
+//
+// Nothing here skips. If the corpus is absent the suite throws with
+// instructions, because a conformance test that quietly does not run is
+// worse than no test at all.
 
 import { test, describe } from 'node:test'
 import assert from 'node:assert'
-import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { Tabnas } from '@tabnas/parser'
 import { jsonic } from '@tabnas/jsonic'
 import { Feed, detect } from '../dist/feed.js'
-import type {
-  AtomFeed,
-  FeedDialect,
-  FeedVersion,
-} from '../dist/feed.js'
+import type { AtomFeed, FeedDialect, FeedVersion } from '../dist/feed.js'
 
-const SUITE_DIR = join(__dirname, '..', '..', 'test', 'feedparser-wellformed')
+import { requireCorpus, walkXml, read, rel, isFeedRoot, rootLocalName, fmtFails } from './corpus.js'
+import { parseExpect, resolve } from './expect-eval.js'
 
-// Read all .xml files in a subdirectory.
-function loadDir(name: string): { file: string; src: string }[] {
-  const dir = join(SUITE_DIR, name)
-  if (!existsSync(dir)) return []
-  return readdirSync(dir)
-    .filter((f) => f.endsWith('.xml'))
-    .sort()
-    .map((f) => ({ file: f, src: readFileSync(join(dir, f), 'utf8') }))
-}
+const SUITE = requireCorpus('feedparser', 'fetch-feedparser.sh')
+const WELLFORMED = join(SUITE, 'wellformed')
+const ILLFORMED = join(SUITE, 'illformed')
 
-const ATOM10 = loadDir('atom10')
-const ATOM = loadDir('atom')
-const RSS = loadDir('rss')
-const RDF = loadDir('rdf')
+const wfAll = walkXml(WELLFORMED)
+const illAll = walkXml(ILLFORMED)
 
-// Reusable parsers — atom output (default) and raw output for detection.
+assert.ok(1000 < wfAll.length,
+  `feedparser wellformed corpus looks truncated: ${wfAll.length} files. ` +
+  `Re-run ./scripts/fetch-feedparser.sh`)
+assert.ok(0 < illAll.length,
+  `feedparser illformed corpus missing. Re-run ./scripts/fetch-feedparser.sh`)
+
+// Documents whose root is not feed/rss/RDF are outside the README's claim
+// (RSS 0.90-2.0 + Atom 0.3/1.0) and are reported, not asserted.
+const wf = wfAll.filter((p) => isFeedRoot(read(p)))
+const wfOutOfClaim = wfAll.length - wf.length
+
 const atomParse = new Tabnas().use(jsonic).use(Feed)
 const rawParse = new Tabnas().use(jsonic).use(Feed, { format: 'raw' })
 
 
-describe('feedparser-wellformed - dialect / version detection', () => {
-  if (!existsSync(SUITE_DIR)) {
-    test('suite unavailable', () => {
-      console.warn(`feedparser-wellformed not vendored at ${SUITE_DIR}; skipping.`)
-    })
-    return
-  }
-
-  function check(
-    files: { file: string; src: string }[],
-    expect: { dialect: FeedDialect; version: FeedVersion | FeedVersion[] },
-    label: string,
-  ) {
-    test(label, () => {
-      const fails: string[] = []
-      for (const { file, src } of files) {
-        const root: any = rawParse.parse(src)
-        const got = detect(root)
-        const versionsOk = Array.isArray(expect.version)
-          ? expect.version.includes(got.version)
-          : got.version === expect.version
-        if (got.dialect !== expect.dialect || !versionsOk) {
-          fails.push(`  ${file}: got ${got.dialect}/${got.version}`)
-        }
+describe('feedparser: well-formed documents must PARSE', () => {
+  test(`${wf.length} documents`, () => {
+    const fails: string[] = []
+    for (const p of wf) {
+      try {
+        const f = atomParse.parse(read(p)) as AtomFeed
+        if (!f || 'atom' !== f.format) fails.push(`${rel(p)}: not an atom-shaped result`)
+      } catch (e: any) {
+        fails.push(`${rel(p)}: ${String(e?.message).split('\n')[0]}`)
       }
-      assert.deepEqual(fails, [], `${label} mismatches:\n${fails.join('\n')}`)
-    })
-  }
-
-  check(ATOM10, { dialect: 'atom', version: 'atom10' }, 'atom10/* -> atom/atom10')
-  check(ATOM, { dialect: 'atom', version: 'atom03' }, 'atom/* -> atom/atom03')
-  check(
-    RSS,
-    { dialect: 'rss', version: ['rss20', 'rss092', 'rss091u', 'rss091n'] },
-    'rss/* -> rss/(any 0.91/0.92/2.0)',
-  )
-  check(
-    RDF,
-    { dialect: 'rdf', version: ['rss10', 'rss090'] },
-    'rdf/* -> rdf/(rss10 or rss090)',
-  )
+    }
+    console.log(
+      `feedparser wellformed: ${wf.length - fails.length}/${wf.length} parsed` +
+      ` (+${wfOutOfClaim} non-RSS/Atom roots, outside the claim, not asserted)`)
+    assert.deepEqual(fails, [],
+      `parse failures (${fails.length}/${wf.length}):\n${fmtFails(fails)}`)
+  })
 })
 
 
-describe('feedparser-wellformed - parse without error', () => {
-  if (!existsSync(SUITE_DIR)) return
+describe('feedparser: well-formed documents must produce the EXPECTED VALUE', () => {
+  test('upstream `Expect:` annotations hold', () => {
+    const fails: string[] = []
+    const unmapped = new Map<string, number>()
+    let supported = 0, checked = 0, unmappedFiles = 0
+    for (const p of wf) {
+      const src = read(p)
+      const clauses = parseExpect(src)
+      if (null === clauses) continue
+      supported++
+      let f: any
+      try {
+        f = atomParse.parse(src)
+      } catch (e: any) {
+        fails.push(`${rel(p)}: parse threw: ${String(e?.message).split('\n')[0]}`)
+        continue
+      }
+      let sawUnmapped = false
+      let bad: string | null = null
+      for (const c of clauses) {
+        const r = resolve(f, c.steps)
+        if (!r.ok) {
+          sawUnmapped = true
+          unmapped.set(r.why, (unmapped.get(r.why) ?? 0) + 1)
+          continue
+        }
+        if (r.value !== c.want) {
+          bad = `${c.path} = ${JSON.stringify(r.value)}, expected ${JSON.stringify(c.want)}`
+          break
+        }
+      }
+      if (null !== bad) fails.push(`${rel(p)}: ${bad}`)
+      else if (sawUnmapped) unmappedFiles++
+      else checked++
+    }
+    const top = [...unmapped.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15)
+    console.log(
+      `feedparser values: ${checked}/${checked + fails.length} correct` +
+      ` (${supported} of ${wf.length} files have a machine-checkable Expect;` +
+      ` ${unmappedFiles} use paths this harness does not map — known gap)\n` +
+      `  top unmapped paths: ${top.map(([k, v]) => `${k}(${v})`).join(' ')}`)
+    assert.deepEqual(fails, [],
+      `value failures (${fails.length}/${checked + fails.length}):\n${fmtFails(fails)}`)
+  })
+})
 
-  function checkAll(set: { file: string; src: string }[], label: string) {
-    test(`all ${label} files parse to a feed`, () => {
-      const fails: { file: string; err: string }[] = []
-      for (const { file, src } of set) {
+
+describe('feedparser: ill-formed documents must be REJECTED', () => {
+  // NOTE (known gap, deliberately left RED rather than narrowed):
+  // feedparser's `bozo` flag is broader than XML well-formedness — it also
+  // covers declared-vs-actual character-encoding mismatches (illformed/chardet/*)
+  // and GeoRSS/GML coordinate errors (illformed/geo/*), neither of which a
+  // string-input XML parser can or should detect. Those cases are left IN the
+  // corpus and left FAILING. Do not remove them to get green; either the
+  // parser learns to reject them or the gap is stated here in writing.
+  test(`${illAll.length} documents`, () => {
+    const fails: string[] = []
+    for (const p of illAll) {
+      let threw = false
+      try { atomParse.parse(read(p)) } catch { threw = true }
+      if (!threw) fails.push(`ACCEPTED but upstream marks it ill-formed: ${rel(p)}`)
+    }
+    console.log(
+      `feedparser illformed: ${illAll.length - fails.length}/${illAll.length} rejected`)
+    assert.deepEqual(fails, [],
+      `must-reject failures (${fails.length}/${illAll.length}):\n${fmtFails(fails)}`)
+  })
+})
+
+
+// Dialect / version detection.
+//
+// Two oracles, both the corpus's own, never invented here:
+//
+//  * `wellformed/atom10/` and `wellformed/rdf/` are version-homogeneous
+//    upstream directories, so the directory names the expected version.
+//    `wellformed/atom/` and `wellformed/rss/` are NOT — e.g.
+//    atom/entry_published_parsed.xml declares the Atom 1.0 namespace and
+//    rss/rss_version_090.xml is an RDF document — so no directory-level
+//    version expectation is asserted for those two.
+//  * The upstream `Expect: ... version == 'X'` annotation, wherever a
+//    document carries one. That is feedparser's own recorded answer and it
+//    covers every dialect the corpus exercises.
+describe('feedparser: dialect / version detection', () => {
+  const groups: [string, FeedDialect, FeedVersion[]][] = [
+    ['atom10', 'atom', ['atom10']],
+    ['rdf', 'rdf', ['rss10', 'rss090']],
+  ]
+  for (const [sub, dialect, versions] of groups) {
+    test(`wellformed/${sub}/* -> ${dialect}`, () => {
+      const files = walkXml(join(WELLFORMED, sub))
+      assert.ok(0 < files.length, `wellformed/${sub} is empty — corpus wrong?`)
+      const fails: string[] = []
+      for (const p of files) {
         try {
-          const f = atomParse.parse(src) as AtomFeed
-          if (f.format !== 'atom') {
-            fails.push({ file, err: `format=${f.format}` })
+          const got = detect(rawParse.parse(read(p)) as any)
+          if (got.dialect !== dialect || !versions.includes(got.version)) {
+            fails.push(`${rel(p)}: ${got.dialect}/${got.version}`)
           }
         } catch (e: any) {
-          fails.push({ file, err: e?.message || String(e) })
+          fails.push(`${rel(p)}: ${String(e?.message).split('\n')[0]}`)
         }
       }
-      assert.deepEqual(
-        fails,
-        [],
-        `${label} failures:\n${fails.map((x) => `  ${x.file}: ${x.err}`).join('\n')}`,
-      )
+      assert.deepEqual(fails, [],
+        `${sub} detection failures (${fails.length}/${files.length}):\n${fmtFails(fails)}`)
     })
   }
 
-  checkAll(ATOM10, 'atom10')
-  checkAll(ATOM, 'atom')
-  checkAll(RSS, 'rss')
-  checkAll(RDF, 'rdf')
-})
-
-
-// Targeted value checks against vendored corpus files. We match feedparser's
-// own Description/Expect comments (translated to our shape).
-describe('feedparser-wellformed - targeted value checks', () => {
-  if (!existsSync(SUITE_DIR)) return
-
-  function findFile(set: { file: string; src: string }[], name: string) {
-    return set.find((x) => x.file === name)?.src
-  }
-
-  test('atom10/entry_title -> entries[0].title.value == "Example Atom"', () => {
-    const src = findFile(ATOM10, 'entry_title.xml')
-    assert.ok(src, 'fixture present')
-    const f = atomParse.parse(src!) as AtomFeed
-    assert.equal(f.entries[0].title?.value, 'Example Atom')
+  // The dialect implied by the document element, read from the source text.
+  test('dialect matches the document element', () => {
+    const want: Record<string, string> = { feed: 'atom', rss: 'rss', RDF: 'rdf' }
+    const fails: string[] = []
+    for (const p of wf) {
+      const src = read(p)
+      try {
+        const got = detect(rawParse.parse(src) as any)
+        const w = want[rootLocalName(src)]
+        if (got.dialect !== w) fails.push(`${rel(p)}: ${got.dialect} (root <${rootLocalName(src)}>)`)
+      } catch (e: any) {
+        fails.push(`${rel(p)}: ${String(e?.message).split('\n')[0]}`)
+      }
+    }
+    console.log(`feedparser dialect: ${wf.length - fails.length}/${wf.length} correct`)
+    assert.deepEqual(fails, [],
+      `dialect failures (${fails.length}/${wf.length}):\n${fmtFails(fails)}`)
   })
 
-  test('atom10/entry_author_email -> entries[0].authors[0].email', () => {
-    const src = findFile(ATOM10, 'entry_author_email.xml')
-    assert.ok(src, 'fixture present')
-    const f = atomParse.parse(src!) as AtomFeed
-    assert.equal(f.entries[0].authors?.[0].email, 'me@example.com')
-  })
-
-  test('atom10/entry_author_name -> entries[0].authors[0].name', () => {
-    const src = findFile(ATOM10, 'entry_author_name.xml')
-    assert.ok(src, 'fixture present')
-    const f = atomParse.parse(src!) as AtomFeed
-    assert.equal(f.entries[0].authors?.[0].name, 'Example author')
-  })
-
-  test('atom10/entry_id -> entries[0].id', () => {
-    const src = findFile(ATOM10, 'entry_id.xml')
-    assert.ok(src, 'fixture present')
-    const f = atomParse.parse(src!) as AtomFeed
-    assert.ok(f.entries[0].id, 'id present')
-  })
-
-  test('atom10/entry_link_href -> entries[0].links[0].href', () => {
-    const src = findFile(ATOM10, 'entry_link_href.xml')
-    assert.ok(src, 'fixture present')
-    const f = atomParse.parse(src!) as AtomFeed
-    assert.ok(f.entries[0].links?.[0].href, 'href present')
-  })
-
-  test('atom/entry_title -> entries[0].title.value', () => {
-    const src = findFile(ATOM, 'entry_title.xml')
-    assert.ok(src, 'fixture present')
-    const f = atomParse.parse(src!) as AtomFeed
-    assert.ok(f.entries[0].title?.value, 'title present')
-  })
-
-  test('atom/entry_issued -> entries[0].published', () => {
-    const src = findFile(ATOM, 'entry_issued.xml')
-    assert.ok(src, 'fixture present')
-    const f = atomParse.parse(src!) as AtomFeed
-    assert.ok(f.entries[0].published, 'published present')
-  })
-
-  test('atom/entry_modified -> entries[0].updated', () => {
-    const src = findFile(ATOM, 'entry_modified.xml')
-    assert.ok(src, 'fixture present')
-    const f = atomParse.parse(src!) as AtomFeed
-    assert.ok(f.entries[0].updated, 'updated present')
-  })
-
-  test('rss/channel_title -> title.value == "Example feed"', () => {
-    const src = findFile(RSS, 'channel_title.xml')
-    assert.ok(src, 'fixture present')
-    const f = atomParse.parse(src!) as AtomFeed
-    assert.equal(f.title?.value, 'Example feed')
-  })
-
-  test('rss/item_title -> entries[0].title.value', () => {
-    const src = findFile(RSS, 'item_title.xml')
-    assert.ok(src, 'fixture present')
-    const f = atomParse.parse(src!) as AtomFeed
-    assert.equal(f.entries[0].title?.value, 'Item 1 title')
-  })
-
-  test('rss/item_link -> entries[0].links[0].href', () => {
-    const src = findFile(RSS, 'item_link.xml')
-    assert.ok(src, 'fixture present')
-    const f = atomParse.parse(src!) as AtomFeed
-    assert.ok(f.entries[0].links?.[0].href, 'href present')
-  })
-
-  test('rss/item_guid -> entries[0].id', () => {
-    const src = findFile(RSS, 'item_guid.xml')
-    assert.ok(src, 'fixture present')
-    const f = atomParse.parse(src!) as AtomFeed
-    assert.ok(f.entries[0].id, 'id present')
-  })
-
-  test('rss/item_enclosure_url -> entries[0].links has rel=enclosure', () => {
-    const src = findFile(RSS, 'item_enclosure_url.xml')
-    assert.ok(src, 'fixture present')
-    const f = atomParse.parse(src!) as AtomFeed
-    const enc = f.entries[0].links?.find((l) => l.rel === 'enclosure')
-    assert.ok(enc, 'enclosure link present')
-  })
-
-  test('rdf/rdf_channel_title -> title.value == "Example feed"', () => {
-    const src = findFile(RDF, 'rdf_channel_title.xml')
-    assert.ok(src, 'fixture present')
-    const f = atomParse.parse(src!) as AtomFeed
-    assert.equal(f.title?.value, 'Example feed')
-  })
-
-  test('rdf/rdf_item_title -> entries[0].title.value == "Example title"', () => {
-    const src = findFile(RDF, 'rdf_item_title.xml')
-    assert.ok(src, 'fixture present')
-    const f = atomParse.parse(src!) as AtomFeed
-    assert.equal(f.entries[0].title?.value, 'Example title')
-  })
-
-  test('rdf/rss090_channel_title -> title.value == "Example title"', () => {
-    const src = findFile(RDF, 'rss090_channel_title.xml')
-    assert.ok(src, 'fixture present')
-    const f = atomParse.parse(src!) as AtomFeed
-    assert.equal(f.title?.value, 'Example title')
-  })
-
-  test('rdf/rdf_item_rdf_about -> entries[0].id is the rdf:about URI', () => {
-    const src = findFile(RDF, 'rdf_item_rdf_about.xml')
-    assert.ok(src, 'fixture present')
-    const f = atomParse.parse(src!) as AtomFeed
-    assert.equal(f.entries[0].id, 'http://example.org/1')
+  // The upstream `Expect: ... version == 'X'` annotation.
+  test("upstream `version == '...'` annotations hold", () => {
+    const fails: string[] = []
+    let checked = 0
+    for (const p of wf) {
+      const src = read(p)
+      const m = src.match(/version == '([a-z0-9]+)'/)
+      if (!m) continue
+      checked++
+      try {
+        const got = detect(rawParse.parse(src) as any)
+        if (got.version !== m[1]) fails.push(`${rel(p)}: ${got.version}, upstream says ${m[1]}`)
+      } catch (e: any) {
+        fails.push(`${rel(p)}: ${String(e?.message).split('\n')[0]}`)
+      }
+    }
+    assert.ok(0 < checked, 'no version annotations found — corpus wrong?')
+    console.log(`feedparser version: ${checked - fails.length}/${checked} correct`)
+    assert.deepEqual(fails, [],
+      `version failures (${fails.length}/${checked}):\n${fmtFails(fails)}`)
   })
 })

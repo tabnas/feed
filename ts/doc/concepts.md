@@ -130,7 +130,7 @@ languages immediately.
 A subset of the well-formed feed corpus from
 [`kurtmckee/feedparser`](https://github.com/kurtmckee/feedparser) is
 also vendored at
-[`test/feedparser-wellformed/`](../../test/feedparser-wellformed/) under
+the fetched corpus at `test/feedparser/` under
 BSD 2-Clause; both languages run the same no-error and targeted value
 checks against it.
 

@@ -30,7 +30,7 @@ exported for callers working with `raw` output.
 | [`ts/`](ts/) | **Canonical** TypeScript implementation — the `@tabnas/feed` package. Everything lives in `src/feed.ts` (plugin + types + helpers). No CLI. |
 | [`go/`](go/) | Go port — module `github.com/tabnas/feed/go`. Plugin + helpers in `go/feed.go`; top-level `const Version` mirrors `ts/package.json`. |
 | [`test/spec/`](test/spec/) | Shared `.tsv` conformance fixtures. Both runtimes auto-discover this dir; the header row's second column name selects what is compared (`expected` = the parse result, `detect` = the dialect report). See [`test/AGENTS.md`](test/AGENTS.md). |
-| [`test/feedparser-wellformed/`](test/feedparser-wellformed/) | Vendored well-formed feed corpus from kurtmckee/feedparser (BSD 2-Clause), in `atom10/` `atom/` `rss/` `rdf/` subdirs. Both runtimes parse these and assert detection. See `THIRD_PARTY_NOTICES.md`. |
+| [`scripts/`](scripts/) | `fetch-corpus.mjs` + the two `fetch-<suite>.sh` wrappers. They materialise the third-party conformance corpora at PINNED commits into `test/feedparser/` and `test/feedvalidator/`, both gitignored. **Never commit a third-party corpus.** See `THIRD_PARTY_NOTICES.md`. |
 | [`ts/doc/grammar.svg`](ts/doc/grammar.svg) / `grammar.txt` | Railroad diagram of the (xml) grammar, regenerated with `@tabnas/railroad`. |
 
 There is no `package.json` `bin` — this package has no CLI.
@@ -132,7 +132,7 @@ Go (module in `go/`):
 
 ```bash
 cd go && go build ./...
-cd go && go test -v ./...               # runs test/spec + feedparser-wellformed
+cd go && go test -v ./...               # runs test/spec + both fetched corpora
 ```
 
 Or via the top-level `Makefile` (ts canonical, go tracks it):
@@ -151,9 +151,17 @@ tags `go/vX.Y.Z`, and (when `gh` is present) cuts a release.
 - `ts/test/parity.test.ts` / `go/parity_test.go` drive the shared
   `test/spec/*.tsv` fixtures across the three formats (`atom`, `native`, plus
   `detect`).
-- `ts/test/feedparser.test.ts` / the Go equivalent run the vendored
-  `test/feedparser-wellformed/` corpus and assert dialect/version
-  detection per subdir.
+- `ts/test/feedparser.test.ts` / `go/conformance_test.go` run the fetched
+  kurtmckee/feedparser corpus: well-formed documents must parse, must match
+  the upstream `Expect:` VALUE annotation (see `ts/test/expect-eval.ts`), and
+  `tests/illformed/` must be rejected.
+- `ts/test/feedvalidator.test.ts` / `go/conformance_test.go` run the fetched
+  rubys/feedvalidator corpus (the W3C Feed Validation Service suite):
+  `Expect: SAXError` cases must be rejected, feed-rooted cases must be
+  accepted with the right dialect.
+- NEITHER corpus is committed. `npm test` fetches via the `pretest` script;
+  the Go suite fetches on demand from `requireCorpus`. If a corpus cannot be
+  made available the suites FAIL — they never skip.
 - `ts/test/feed.test.ts` covers TS-only behavior: error paths, `raw`
   mode, and plugin registration shape.
 - `ts/test/doc-examples.test.ts` runs the fenced examples from the

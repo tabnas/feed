@@ -44,9 +44,15 @@ class identity of the feed structs do not affect the comparison.
 Both discover files by directory listing: adding a `.tsv` here runs it in
 both runtimes without touching either runner.
 
-`test/feedparser-wellformed/` is a separate, larger third-party corpus used
-for smoke coverage (`TestCorpus*` / `feedparser.test.ts`), not for pinning
-exact output — keep new behavioural cases here in `spec/` instead.
+`test/feedparser/` and `test/feedvalidator/` are the third-party conformance
+corpora. They are FETCHED at pinned commits (`scripts/fetch-*.sh`) and are
+gitignored — never commit them. They cover breadth; keep new behavioural
+cases here in `spec/` instead.
+
+`leniency.tsv` and `nonxml.tsv` are deliberately RED as of the
+conformance-2026-08 baseline: they pin XML well-formedness that the engine
+currently does not enforce. A red test is an honest test — do not delete or
+loosen them to get green.
 
 ## Rules
 

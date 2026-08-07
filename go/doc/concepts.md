@@ -109,7 +109,7 @@ produces the same shape the TypeScript parser produces with
 test JSON-marshal-unmarshals the parser output and deep-compares it to
 the language-agnostic expected `*.atom.json` / `*.native.json`. The
 vendored well-formed corpus in
-[`../../test/feedparser-wellformed/`](../../test/feedparser-wellformed/)
+the fetched corpus at `../../test/feedparser/`
 (BSD 2-Clause, from
 [kurtmckee/feedparser](https://github.com/kurtmckee/feedparser)) is run
 by both languages too.

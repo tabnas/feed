@@ -5,13 +5,20 @@
 # repo-set go.work + node_modules symlinks (admin/scripts/link.sh).
 
 .PHONY: all build test clean build-ts build-go test-ts test-go \
-        clean-ts clean-go publish-ts publish-go tags-go reset
+        clean-ts clean-go publish-ts publish-go tags-go reset fetch
 
 all: build test
 
 build: build-ts build-go
 
 test: test-ts test-go
+
+# Fetch the third-party conformance corpora at their pinned commits. They are
+# NEVER committed (see scripts/fetch-corpus.mjs and .gitignore). Idempotent.
+# `npm test` runs this automatically via the ts/ `pretest` script, and the Go
+# suite fetches on demand — the corpora must never be silently absent.
+fetch:
+	node scripts/fetch-corpus.mjs all
 
 clean: clean-ts clean-go
 
@@ -33,7 +40,7 @@ publish-ts: test-ts
 build-go:
 	cd go && go build ./...
 
-test-go:
+test-go: fetch
 	cd go && go test -v ./...
 
 clean-go:

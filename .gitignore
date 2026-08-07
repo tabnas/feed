@@ -34,3 +34,8 @@ yarn.lock
 
 # Go
 go/vendor/
+
+# Third-party conformance corpora — FETCHED, never committed.
+# See scripts/fetch-feedparser.sh and scripts/fetch-feedvalidator.sh.
+test/feedparser/
+test/feedvalidator/

@@ -4,7 +4,6 @@ package tabnasfeed_test
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -13,17 +12,16 @@ import (
 
 	tabnasfeed "github.com/tabnas/feed/go"
 	jsonic "github.com/tabnas/jsonic/go"
-	xml "github.com/tabnas/xml/go"
 )
 
-// wellformedDir resolves test/feedparser-wellformed.
+// wellformedDir resolves the fetched kurtmckee/feedparser well-formed corpus.
+// The corpus is NOT committed (scripts/fetch-feedparser.sh fetches it at a
+// pinned commit into a gitignored dir), and its absence is a hard FAILURE —
+// never a skip: a conformance test that quietly does not run is worse than
+// no test at all.
 func wellformedDir(t *testing.T) string {
 	t.Helper()
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	return filepath.Join(wd, "..", "test", "feedparser-wellformed")
+	return filepath.Join(requireCorpus(t, "feedparser", "fetch-feedparser.sh"), "wellformed")
 }
 
 // canon marshals a Go value via JSON and unmarshals it back to `any` so
@@ -61,7 +59,7 @@ func buildParser(t *testing.T, format string) *jsonic.Jsonic {
 // live as TSV rows under test/spec, run by parity_test.go here and by
 // ts/test/parity.test.ts — one mechanism instead of two. See test/AGENTS.md.
 
-// --- feedparser-wellformed corpus -----------------------------------------
+// --- feedparser well-formed corpus (fetched, see conformance_test.go) -----
 
 func corpusFiles(t *testing.T, sub string) []string {
 	t.Helper()
@@ -80,95 +78,18 @@ func corpusFiles(t *testing.T, sub string) []string {
 	return out
 }
 
-type expected struct {
-	dialect  string
-	versions []string
-}
-
-var corpusExpect = map[string]expected{
-	"atom10": {dialect: "atom", versions: []string{"atom10"}},
-	"atom":   {dialect: "atom", versions: []string{"atom03"}},
-	"rss":    {dialect: "rss", versions: []string{"rss20", "rss092", "rss091u", "rss091n"}},
-	"rdf":    {dialect: "rdf", versions: []string{"rss10", "rss090"}},
-}
-
-func TestCorpusDetect(t *testing.T) {
-	if _, err := os.Stat(wellformedDir(t)); err != nil {
-		t.Skip("feedparser-wellformed not vendored")
-	}
-	// Build a raw-format parser by registering the xml plugin directly;
-	// we don't need feed conversion to call Detect.
-	j := jsonic.Make()
-	if err := j.UseDefaults(xml.Xml, xml.Defaults); err != nil {
-		t.Fatalf("xml plugin: %v", err)
-	}
-
-	for sub, expect := range corpusExpect {
-		sub, expect := sub, expect
-		t.Run(sub, func(t *testing.T) {
-			var fails []string
-			for _, path := range corpusFiles(t, sub) {
-				src, err := os.ReadFile(path)
-				if err != nil {
-					t.Fatalf("read %s: %v", path, err)
-				}
-				root, err := j.Parse(string(src))
-				if err != nil {
-					fails = append(fails, fmt.Sprintf("%s: parse err %v", filepath.Base(path), err))
-					continue
-				}
-				got := tabnasfeed.Detect(root)
-				if got.Dialect != expect.dialect {
-					fails = append(fails, fmt.Sprintf("%s: dialect=%s", filepath.Base(path), got.Dialect))
-					continue
-				}
-				if !contains(expect.versions, got.Version) {
-					fails = append(fails, fmt.Sprintf("%s: version=%s", filepath.Base(path), got.Version))
-				}
-			}
-			if len(fails) > 0 {
-				t.Fatalf("%s detection failures:\n  %s", sub, strings.Join(fails, "\n  "))
-			}
-		})
-	}
-}
-
-func TestCorpusParseAtom(t *testing.T) {
-	if _, err := os.Stat(wellformedDir(t)); err != nil {
-		t.Skip("feedparser-wellformed not vendored")
-	}
-	atomParse := buildParser(t, "atom")
-	for sub := range corpusExpect {
-		sub := sub
-		t.Run(sub, func(t *testing.T) {
-			var fails []string
-			for _, path := range corpusFiles(t, sub) {
-				src, err := os.ReadFile(path)
-				if err != nil {
-					t.Fatalf("read %s: %v", path, err)
-				}
-				got, err := atomParse.Parse(string(src))
-				if err != nil {
-					fails = append(fails, fmt.Sprintf("%s: %v", filepath.Base(path), err))
-					continue
-				}
-				if af, ok := got.(tabnasfeed.AtomFeed); !ok || af.Format != "atom" {
-					fails = append(fails, fmt.Sprintf("%s: bad shape %T", filepath.Base(path), got))
-				}
-			}
-			if len(fails) > 0 {
-				t.Fatalf("%s parse failures:\n  %s", sub, strings.Join(fails, "\n  "))
-			}
-		})
-	}
-}
+// TestCorpusDetect and TestCorpusParseAtom used to live here. They are
+// superseded by conformance_test.go, which runs the same corpus against a
+// sound oracle: TestCorpusDetect expected every file under wellformed/atom/
+// to be Atom 0.3 and every file under wellformed/rss/ to be RSS, but those
+// upstream directories are not version-homogeneous (atom/entry_published_parsed.xml
+// declares the Atom 1.0 namespace; rss/rss_version_090.xml is an RDF
+// document), so that expectation was wrong, not merely strict. The targeted
+// value checks below are kept.
 
 // --- targeted value checks (from feedparser comments) ---------------------
 
 func TestCorpusTargets(t *testing.T) {
-	if _, err := os.Stat(wellformedDir(t)); err != nil {
-		t.Skip("feedparser-wellformed not vendored")
-	}
 	atomParse := buildParser(t, "atom")
 
 	cases := []struct {
