@@ -8,12 +8,13 @@ guide](guide.md); for rationale see [concepts](concepts.md).
 
 ## Exports
 
-`@tabnas/feed` exports one value plus one function and a set of types:
+`@tabnas/feed` exports two values plus one function and a set of types:
 
-| Export   | Kind     | Description                                       |
-| -------- | -------- | ------------------------------------------------- |
-| `Feed`   | `Plugin` | The plugin to register on a `Tabnas` engine.      |
-| `detect` | function | `detect(root: XmlElement) => { dialect, version }`. |
+| Export    | Kind     | Description                                       |
+| --------- | -------- | ------------------------------------------------- |
+| `Feed`    | `Plugin` | The plugin to register on a `Tabnas` engine.      |
+| `detect`  | function | `detect(root: XmlElement) => { dialect, version }`. |
+| `VERSION` | `string` | Package version; always equal to `package.json` "version". |
 
 Exported types: `FeedFormat`, `FeedDialect`, `FeedVersion`,
 `FeedOptions`, `FeedResult`, `AtomFeed`, `AtomEntry`, `AtomText`,

@@ -17,7 +17,7 @@ Import path: `github.com/tabnas/feed/go`, package name `feed`.
 | `Defaults`                            | `map[string]any` | `{"format": "atom", "strictNamespaces": true}` — merged with caller options. |
 | `Detect(root any) Detection`          | func     | Report dialect/version of a raw XML root.    |
 | `Convert(root any, format string) (any, error)` | func | Turn a raw element tree into the requested shape. |
-| `Version`                             | `string` | Package version (`"0.1.0"`), mirrors `ts/package.json`. |
+| `VERSION`                             | `string` | Module version; always equal to `ts/package.json` "version". |
 
 Public types: `Detection`, `AtomFeed`, `AtomEntry`, `AtomEntrySource`,
 `AtomText`, `AtomPerson`, `AtomLink`, `AtomCategory`, `AtomGenerator`,
