@@ -14,7 +14,7 @@ Import path: `github.com/tabnas/feed/go`, package name `feed`.
 | Symbol                                | Kind     | Description                                  |
 | ------------------------------------- | -------- | -------------------------------------------- |
 | `Feed(j *tabnasjsonic.Jsonic, opts map[string]any) error` | func | Plugin entry point; register with `UseDefaults`. |
-| `Defaults`                            | `map[string]any` | `{"format": "atom"}` — merged with caller options. |
+| `Defaults`                            | `map[string]any` | `{"format": "atom", "strictNamespaces": true}` — merged with caller options. |
 | `Detect(root any) Detection`          | func     | Report dialect/version of a raw XML root.    |
 | `Convert(root any, format string) (any, error)` | func | Turn a raw element tree into the requested shape. |
 | `Version`                             | `string` | Package version (`"0.1.0"`), mirrors `ts/package.json`. |
@@ -39,21 +39,22 @@ result, err := j.Parse(source)                        // (any, error)
 `UseDefaults` merges each supplied option map over the preceding ones
 (so `Defaults` first, then caller `opts`), giving caller options
 precedence. Pass no extra map for defaults-only. `Feed` calls
-`j.UseDefaults(tabnasxml.Xml, tabnasxml.Defaults)` internally, so the XML plugin is
+`j.UseDefaults(tabnasxml.Xml, tabnasxml.Defaults, ...)` internally, so the XML plugin is
 installed for you — you still need `github.com/tabnas/xml/go` as a
 dependency. `Feed` is idempotent: it short-circuits if already applied
 to the instance.
 
 ## Options
 
-Exactly one option is supported.
+Two options are supported.
 
-| Key      | Type     | Default  | Effect                                          |
-| -------- | -------- | -------- | ----------------------------------------------- |
-| `format` | `string` | `"atom"` | Output shape (see below).                       |
+| Key                | Type     | Default  | Effect                                          |
+| ------------------ | -------- | -------- | ----------------------------------------------- |
+| `format`           | `string` | `"atom"` | Output shape (see below).                       |
+| `strictNamespaces` | `bool`   | `true`   | Enforce Namespaces in XML 1.0 (see below).      |
 
 ```go
-var Defaults = map[string]any{"format": "atom"}
+var Defaults = map[string]any{"format": "atom", "strictNamespaces": true}
 ```
 
 - `"atom"` (default) — every dialect is normalised to a single
@@ -65,6 +66,18 @@ var Defaults = map[string]any{"format": "atom"}
 
 An empty or absent `format` defaults to `"atom"`. Any other string is
 treated as `"atom"` by the conversion (it returns the normalised shape).
+
+`strictNamespaces` is passed straight through to `github.com/tabnas/xml/go`,
+but with the opposite default. The XML plugin defaults it `false` because
+bare XML 1.0 well-formedness does not require namespace well-formedness;
+`feed` defaults it `true` because feeds are namespace-defined formats — Atom
+*is* its namespace, RSS 1.0 is RDF, and every RSS 2.0 extension (`dc:`,
+`content:`, `sy:`, `georss:`) is a prefixed name, so an element or attribute
+with an undeclared prefix is a typo or a truncated document rather than an
+extension to pass through. With the default, `<dc:language>` in a feed that
+never declares `xmlns:dc` is an `unbound_prefix` error. Pass
+`map[string]any{"strictNamespaces": false}` for the laxer bare-XML
+behaviour.
 
 ## Result types by `format`
 

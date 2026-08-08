@@ -31,6 +31,8 @@ exported for callers working with `raw` output.
 | [`go/`](go/) | Go port — module `github.com/tabnas/feed/go`. Plugin + helpers in `go/feed.go`; top-level `const Version` mirrors `ts/package.json`. |
 | [`test/spec/`](test/spec/) | Shared `.tsv` conformance fixtures. Both runtimes auto-discover this dir; the header row's second column name selects what is compared (`expected` = the parse result, `detect` = the dialect report). See [`test/AGENTS.md`](test/AGENTS.md). |
 | [`test/feedparser-wellformed/`](test/feedparser-wellformed/) | Vendored well-formed feed corpus from kurtmckee/feedparser (BSD 2-Clause), in `atom10/` `atom/` `rss/` `rdf/` subdirs. Both runtimes parse these and assert detection. See `THIRD_PARTY_NOTICES.md`. |
+| `test/feedvalidator/`, `test/feedparser/` | The full third-party conformance corpora, **fetched at a pinned commit and gitignored — never committed**. `make fetch` (or `scripts/fetch-feedvalidator.sh` / `scripts/fetch-feedparser.sh`) populates them. |
+| [`scripts/fetch-corpus.mjs`](scripts/fetch-corpus.mjs) | The fetcher, holding the pinned upstream SHAs. The two `.sh` wrappers are thin `exec`s over it so `npm pretest` works on Windows CI too. |
 | [`ts/doc/grammar.svg`](ts/doc/grammar.svg) / `grammar.txt` | Railroad diagram of the (xml) grammar, regenerated with `@tabnas/railroad`. |
 
 There is no `package.json` `bin` — this package has no CLI.
@@ -110,9 +112,22 @@ Feed: the feed plugin pulls in Xml, and Xml/feed expect jsonic's lexer.
 - **Unrecognized roots throw.** A root element that is not `feed`, `rss`,
   or `RDF` raises `feed: unrecognized root element ...` (covered in
   `feed.test.ts` and the Go suite). `raw` format never reaches that path.
+- **`strictNamespaces` defaults ON here, unlike `@tabnas/xml`.** `feed`
+  installs Xml with `{ strictNamespaces: true }`, so an element or attribute
+  using an undeclared prefix (`<dc:language>` with no `xmlns:dc`) is an
+  error. `@tabnas/xml` defaults it off on purpose — bare XML 1.0
+  well-formedness does not require namespace well-formedness — but feeds are
+  namespace-defined formats: Atom *is* its namespace, RSS 1.0 is RDF, and
+  every RSS 2.0 extension (`dc:`, `content:`, `sy:`, `georss:`) is a
+  prefixed name, so an unbound prefix is a typo or a truncation, not an
+  extension to pass through. The W3C Feed Validation Service agrees: it is
+  worth exactly +6 must-reject documents in the feedvalidator corpus and +1
+  in feedparser's `illformed/`, at a cost of zero well-formed documents.
+  Callers who want the bare-XML behaviour pass `{ strictNamespaces: false }`.
+  Keep the two runtimes' defaults in step — TS `withDefaults`, Go `Defaults`.
 - **Xml `Plugin` type bridge.** `Xml` is still typed against jsonic's
   legacy `Plugin` signature, so `feed.ts` casts it
-  (`tn.use(Xml as unknown as Plugin)`). The two are runtime-compatible;
+  (`tn.use(Xml as unknown as Plugin, { … })`). The two are runtime-compatible;
   the cast is intentional, not a smell to "fix".
 - **CommonJS at runtime.** The package compiles to CommonJS (tsconfig
   `module=nodenext`, no `"type":"module"`), so `require` is available;
@@ -132,16 +147,38 @@ Go (module in `go/`):
 
 ```bash
 cd go && go build ./...
-cd go && go test -v ./...               # runs test/spec + feedparser-wellformed
+cd go && go test -count=1 -v ./...      # spec + feedparser-wellformed + feedvalidator
 ```
+
+**Always pass `-count=1` to the Go suite.** `test/spec/*.tsv`,
+`test/feedparser-wellformed/` and the fetched corpora all sit ABOVE the Go
+module root, so Go does not record them as test inputs. Without `-count=1`,
+editing a shared fixture replays a cached `ok ... (cached)` and the new rows
+never run — a green tick that proves nothing. The `test-go` Makefile target
+passes it.
+
+**`GOWORK=off` is not the same run.** `go test` from `go/` picks up the
+repo-set `go.work` and resolves `github.com/tabnas/xml/go` to the sibling
+checkout; `GOWORK=off go test` resolves the last *published* module. Confirm
+which you are in with `go list -m github.com/tabnas/xml/go` — a bare module
+path means sibling, a path with a version means published. An unpublished
+`xml` fix is invisible to the `GOWORK=off` run, so a green `GOWORK=off` suite
+proves nothing about it (and today an unpublished `xml` fix is exactly what
+the feedvalidator harness depends on — see "Conformance" below).
 
 Or via the top-level `Makefile` (ts canonical, go tracks it):
 
 ```bash
+make fetch        # third-party corpora at their pinned SHAs (idempotent)
 make build        # build-ts then build-go
-make test         # test-ts then test-go
+make test         # fetch, then test-ts then test-go
 make reset        # ts npm reset + go clean/build/test
 ```
+
+`make test` depends on `fetch`, `ts/package.json` has it as `pretest`, and
+the Go harness re-runs the fetcher itself if the corpus is missing — three
+independent paths, because a conformance suite that silently does not run is
+worse than no suite at all.
 
 `make publish-go V=x.y.z` seds `const Version` in `go/feed.go`, commits,
 tags `go/vX.Y.Z`, and (when `gh` is present) cuts a release.
@@ -163,19 +200,160 @@ tags `go/vX.Y.Z`, and (when `gh` is present) cuts a release.
   unless `@tabnas/debug` is installed (a `file:` devDependency) or
   `TABNAS_DEBUG_PATH` points at a built checkout. It asserts the
   structured grammar model (rule set, `config.start`, plugin list, push
-  edges) described under gotchas above.
+  edges) described under gotchas above. In a normal checkout the
+  devDependency resolves, so it runs — a run reporting `skipped 0` is the
+  expected state.
+- `ts/test/perf.test.ts` / `go/perf_test.go` assert that reusing a parser
+  instance is much faster than rebuilding one per parse.
+
+- `ts/test/feedvalidator.test.ts` / `TestFeedValidatorConformance` in
+  `go/conformance_test.go` run the **whole** `rubys/feedvalidator`
+  `testcases/` tree and assert both halves — must-reject and must-accept,
+  plus dialect detection. The two are line-for-line equivalents; a TS/Go
+  divergence shows up as one going red. See "Conformance" below.
+
+**No test may silently not-run.** The `feedparser-wellformed` corpus is
+vendored, so it can never legitimately be absent: `loadDir` (TS) and
+`requireWellformed`/`corpusFiles` (Go) throw or `t.Fatal` on a missing or
+empty directory rather than skipping. Previously they returned an empty set,
+which made every `assert.deepEqual(fails, [])` pass vacuously. The fetched
+corpora get the same treatment: `requireCorpus` throws (TS, at import time)
+or `t.Fatal`s after attempting a fetch (Go), and each harness additionally
+asserts the corpus is not truncated (`1000 < FILES.length`). Neither ever
+`skip`s. Likewise `doc-examples.test.ts` fails when a fenced block carries
+`// =>` but yields no extracted assertion, instead of dropping it. `make
+test` is expected to report `skipped 0` and zero Go `SKIP` lines.
+
+## Conformance: what is actually verified
+
+There is no single canonical RSS/Atom conformance suite (RSS 0.9x/2.0 has no
+formal test suite at all). The two authoritative third-party corpora are
+`rubys/feedvalidator` (the suite behind the W3C Feed Validation Service) and
+`kurtmckee/feedparser`.
+
+**The feedvalidator corpus is wired into `make test`** — the whole
+`testcases/` tree, both halves asserted, in both runtimes
+(`ts/test/feedvalidator.test.ts` and `go/conformance_test.go`, which classify
+and assert identically). It is fetched, not vendored, so `make test` runs
+`make fetch` first and both harnesses fail loudly rather than skip when the
+corpus is absent.
+
+| Corpus | Measure | Result |
+|---|---|---|
+| rubys/feedvalidator `testcases/` | not-well-formed docs rejected | **18/18** (was 16/18) |
+| rubys/feedvalidator `testcases/` | well-formed RSS/Atom docs accepted | **1809/1809** (was 1796/1809) |
+| rubys/feedvalidator `testcases/` | detected dialect matches the corpus directory | **1108/1108** (was 1107/1108) |
+
+"Was" is the same harness run against the last **published** `@tabnas/xml`
+(`v0.4.1`), which is what `GOWORK=off go test ./...` still resolves. All 16
+distinct files behind those three "was" numbers were XML-layer, not
+feed-layer, and every one is now fixed in the `xml` sibling:
+
+- 7 rejected for a UTF-8 BOM before `<?xml` (`unexpected character(s): <`);
+- 5 rejected `undeclared_entity` behind an unread external DTD subset, which
+  XML 1.0 §4.1 WFC *Entity Declared* permits;
+- 2 rejected `unbound_prefix` where the declaration and the use are sibling
+  attributes on the same element (`xmlns:xsi` + `xsi:…`) — §5.2 scopes the
+  declaration over them, so binding must not depend on attribute order. One
+  of the two is the single detect miss;
+- 2 under-rejections: the uppercase-`X` character reference `&#X26;` (XML 1.0
+  [66] admits only lowercase `&#x`) and a namespace name containing a
+  newline.
+
+The mismatched-tag message no longer leaks its `$fsrc`/`$openname`
+placeholders either — under `GOWORK=off` it still reads `closing tag
+</$fsrc> does not match opening tag <$openname>`, which is the cleanest
+one-line demonstration of which module you resolved.
+
+Those behaviours are pinned row-by-row, in both runtimes, in
+[`test/spec/xml-layer.tsv`](test/spec/xml-layer.tsv) — the cheap
+proof-of-fix, without needing the corpus.
+
+**CI is green on these numbers, because BOTH jobs resolve the sibling `xml`
+from its `main` — not the published package.** `polyglot-ci` clones the deps
+listed in `.github/workflows/ci.yml` and then:
+
+- **`go` job** — runs `go work use` over the clones, so `xml/go` resolves to
+  the sibling checkout. The `require github.com/tabnas/xml/go v0.4.1` in
+  `go/go.mod` is overridden by the workspace and never fetched.
+- **`ts` job** — after `npm i`, a link step replaces each installed
+  `@tabnas/*` with a symlink to the sibling `ts/` (a *copy* on the Windows
+  runner, where unprivileged symlinks are unreliable) and only then builds.
+  So `"@tabnas/xml": "*"` and the `0.4.1` pin in `ts/package-lock.json` are
+  both overridden too.
+
+The **published** versions are still unfixed, so the resolution you are in
+decides the result, and only the local published-resolution runs are red:
+`GOWORK=off go test ./...`, and a `ts/` whose `node_modules/@tabnas/xml` is
+the registry build rather than the symlink. Both give `16/18` must-reject,
+`1796/1809` must-accept, `1107/1108` detect, and 7 of the 9
+`xml-layer.tsv` rows red — exactly the "was" column above. That is expected
+until `@tabnas/xml` publishes; bump the `require` in `go/go.mod` and the
+lockfile then, and delete this paragraph.
+
+Do **not** "fix" a red published-resolution run by reverting an
+`xml-layer.tsv` row, skipping the conformance suites, or repointing a
+devDependency at a local path — all three trade a real signal for a green
+tick.
+
+The 18-document must-reject set is the 14 that upstream annotates
+`Expect: SAXError` plus 4 that are objectively not well-formed but carry an
+`Expect:` naming a validator-level diagnostic instead. Those 4 are listed by
+path, with the specific violation quoted, in `NOT_WELL_FORMED` /
+`notWellFormed` in the two harnesses — reclassified, not excused, and the set
+is asserted to be exactly those 4 so a fifth cannot be added silently.
+
+The `kurtmckee/feedparser` corpus is fetched by the same `make fetch` but only
+its 48-file vendored subset (`test/feedparser-wellformed/`) is asserted today.
+Measured over the full tree with the default parser:
+
+| Corpus | Measure | Result |
+|---|---|---|
+| kurtmckee/feedparser `wellformed/` | RSS/Atom-rooted docs parse to an Atom shape | 1734/1734 (100%) |
+| kurtmckee/feedparser `illformed/` | docs annotated `Expect: bozo` are rejected | 5/19 whole dir; 4/14 of the annotated ones |
+
+Those two rows are **measured, not asserted** — there is no harness behind
+them yet. Wiring one (including the value-level `Expect:` evaluator, where the
+real number is far worse than the parse-vs-error number) is the open Phase-2
+work; a draft lives on the `conformance-2026-08` branch. Do not quote the
+first row as a conformance result without saying it is unasserted.
+
+### Still broken, and not ours to fix
+
+`@tabnas/xml` accepts a document with **no document element at all** —
+`<?xml version="1.0"?><!-- c -->` parses to `undefined` instead of raising.
+XML 1.0 §2.1 is `document ::= prolog element Misc*`: exactly one element is
+required. This is distinct from the trailing-content leniency that *was*
+fixed (`…</rss><extra/>` and `…</rss>junk` are both rejected now). It costs
+one file, `test/feedparser/illformed/rss_empty_document.xml`, and nothing in
+feedvalidator. Repro:
+
+```js
+new Tabnas().use(jsonic).use(Xml).parse('<?xml version="1.0"?><!-- c -->')
+// returns undefined; should throw
+```
+
+Fix belongs in `xml`, not here.
+
+Out of the claim, and deliberately not asserted: 333 feedvalidator files whose
+document element is not `feed`/`rss`/`RDF` (KML, OpenSearch, OPML, RSS 1.1
+`Channel`, APP `service`, XRDS, bare `entry`), and feedparser's 8 `chardet/`
+cases, which need byte-level encoding sniffing — `@tabnas/feed` takes a
+`string`, so encoding detection is the caller's job.
 
 ## CI
 
-`.github/workflows/build.yml` has two jobs:
+The old per-repo `.github/workflows/build.yml` is gone. CI is now a thin
+caller: `.github/workflows/ci.yml` (push/PR on `main`) delegates to the org
+workflow `tabnas/.github/.github/workflows/polyglot-ci.yml@main`, passing the
+sibling closure it must clone and build first:
 
-- **build** (Linux/macOS/Windows, Node 24): sets
-  `git config --global core.autocrlf false` (CRLF would corrupt fixtures), then
-  clones the full tabnas closure as siblings — `parser debug json abnf
-  railroad jsonic xml` — `npm i && npm run build` each `*/ts` in that
-  order, and finally `npm test` in `feed/ts`.
-- **build-go** (Linux/macOS, Go 1.24): clones the same siblings, then
-  reconstructs the workspace by mirroring `admin/scripts/link.sh` —
-  creating `vendor/` symlinks for any `../vendor/`-style replaces and a
-  `go.work` over every module except the vendor-replaced ones — then
-  `go build ./...` and `go test -v ./...` in `feed/go`.
+```yaml
+with:
+  deps: "parser debug json abnf railroad jsonic xml"
+```
+
+`.github/workflows/release.yml` builds and publishes. Session credentials
+cannot write `.github/workflows/*` — changes there are promoted by a
+maintainer via `tabnas/admin` `rollout/apply-ci-folders.sh` (admin
+`DECISIONS.md` ADR-8), so edit the org workflow, not this repo.

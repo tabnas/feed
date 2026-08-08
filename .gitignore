@@ -34,3 +34,9 @@ yarn.lock
 
 # Go
 go/vendor/
+
+# Third-party conformance corpora — FETCHED at a pinned commit, never
+# committed. See scripts/fetch-feedparser.sh and scripts/fetch-feedvalidator.sh
+# (both wrap scripts/fetch-corpus.mjs, which holds the pinned SHAs).
+test/feedparser/
+test/feedvalidator/

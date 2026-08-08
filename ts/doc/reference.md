@@ -47,15 +47,16 @@ dependency is required.
 
 ## Options
 
-`FeedOptions` has exactly one field.
+`FeedOptions` has two fields.
 
-| Key      | Type                          | Default  | Effect                                            |
-| -------- | ----------------------------- | -------- | ------------------------------------------------- |
-| `format` | `'atom' \| 'native' \| 'raw'` | `'atom'` | Output shape (see below).                         |
+| Key                | Type                          | Default  | Effect                                            |
+| ------------------ | ----------------------------- | -------- | ------------------------------------------------- |
+| `format`           | `'atom' \| 'native' \| 'raw'` | `'atom'` | Output shape (see below).                         |
+| `strictNamespaces` | `boolean`                     | `true`   | Enforce Namespaces in XML 1.0 (see below).        |
 
 ```ts
 type FeedFormat = 'atom' | 'native' | 'raw'
-type FeedOptions = { format?: FeedFormat }
+type FeedOptions = { format?: FeedFormat; strictNamespaces?: boolean }
 ```
 
 - `'atom'` (default) — every dialect is normalised to a single
@@ -67,6 +68,17 @@ type FeedOptions = { format?: FeedFormat }
 
 An unknown `format` string is not validated; pass only the three
 documented values.
+
+`strictNamespaces` is passed straight through to `@tabnas/xml`, but with
+the opposite default. `@tabnas/xml` defaults it `false` because bare XML 1.0
+well-formedness does not require namespace well-formedness; `@tabnas/feed`
+defaults it `true` because feeds are namespace-defined formats — Atom *is*
+its namespace, RSS 1.0 is RDF, and every RSS 2.0 extension (`dc:`,
+`content:`, `sy:`, `georss:`) is a prefixed name, so an element or attribute
+with an undeclared prefix is a typo or a truncated document rather than an
+extension to pass through. With the default, `<dc:language>` in a feed that
+never declares `xmlns:dc` raises `unbound_prefix`. Set `false` for the
+laxer bare-XML behaviour.
 
 ## Result types by `format`
 

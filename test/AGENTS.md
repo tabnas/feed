@@ -48,6 +48,12 @@ both runtimes without touching either runner.
 for smoke coverage (`TestCorpus*` / `feedparser.test.ts`), not for pinning
 exact output — keep new behavioural cases here in `spec/` instead.
 
+`test/feedvalidator/` and `test/feedparser/` are the FULL third-party
+conformance corpora. They are **fetched** at a pinned commit by
+`scripts/fetch-corpus.mjs` (via `make fetch`, `ts/` `npm pretest`, or the Go
+harness on demand) into gitignored directories — never commit them. They
+cover breadth; keep new behavioural cases here in `spec/` instead.
+
 ## Rules
 
 - Prefer adding a fixture here over a one-off in-language assertion when a

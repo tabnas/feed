@@ -21,14 +21,23 @@ import type {
 
 const SUITE_DIR = join(__dirname, '..', '..', 'test', 'feedparser-wellformed')
 
-// Read all .xml files in a subdirectory.
+// The corpus is VENDORED in this repo, so it can never legitimately be
+// absent or empty. Returning [] for a missing directory would make every
+// `assert.deepEqual(fails, [])` below pass vacuously — a green tick that
+// asserts nothing. Fail loudly instead.
 function loadDir(name: string): { file: string; src: string }[] {
   const dir = join(SUITE_DIR, name)
-  if (!existsSync(dir)) return []
-  return readdirSync(dir)
+  if (!existsSync(dir)) {
+    throw new Error(`vendored corpus directory missing: ${dir}`)
+  }
+  const files = readdirSync(dir)
     .filter((f) => f.endsWith('.xml'))
     .sort()
     .map((f) => ({ file: f, src: readFileSync(join(dir, f), 'utf8') }))
+  if (0 === files.length) {
+    throw new Error(`vendored corpus directory has no .xml files: ${dir}`)
+  }
+  return files
 }
 
 const ATOM10 = loadDir('atom10')
@@ -42,13 +51,6 @@ const rawParse = new Tabnas().use(jsonic).use(Feed, { format: 'raw' })
 
 
 describe('feedparser-wellformed - dialect / version detection', () => {
-  if (!existsSync(SUITE_DIR)) {
-    test('suite unavailable', () => {
-      console.warn(`feedparser-wellformed not vendored at ${SUITE_DIR}; skipping.`)
-    })
-    return
-  }
-
   function check(
     files: { file: string; src: string }[],
     expect: { dialect: FeedDialect; version: FeedVersion | FeedVersion[] },
@@ -86,8 +88,6 @@ describe('feedparser-wellformed - dialect / version detection', () => {
 
 
 describe('feedparser-wellformed - parse without error', () => {
-  if (!existsSync(SUITE_DIR)) return
-
   function checkAll(set: { file: string; src: string }[], label: string) {
     test(`all ${label} files parse to a feed`, () => {
       const fails: { file: string; err: string }[] = []
@@ -119,10 +119,14 @@ describe('feedparser-wellformed - parse without error', () => {
 // Targeted value checks against vendored corpus files. We match feedparser's
 // own Description/Expect comments (translated to our shape).
 describe('feedparser-wellformed - targeted value checks', () => {
-  if (!existsSync(SUITE_DIR)) return
-
+  // A missing named fixture must be a failure, not an undefined that the
+  // caller happens to guard away.
   function findFile(set: { file: string; src: string }[], name: string) {
-    return set.find((x) => x.file === name)?.src
+    const hit = set.find((x) => x.file === name)
+    if (undefined === hit) {
+      throw new Error(`vendored corpus fixture missing: ${name}`)
+    }
+    return hit.src
   }
 
   test('atom10/entry_title -> entries[0].title.value == "Example Atom"', () => {

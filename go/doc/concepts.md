@@ -112,7 +112,11 @@ vendored well-formed corpus in
 [`../../test/feedparser-wellformed/`](../../test/feedparser-wellformed/)
 (BSD 2-Clause, from
 [kurtmckee/feedparser](https://github.com/kurtmckee/feedparser)) is run
-by both languages too.
+by both languages too, as is the full
+[rubys/feedvalidator](https://github.com/rubys/feedvalidator) conformance
+corpus — fetched at a pinned commit rather than committed, and asserted on
+both halves (`go/conformance_test.go`, the twin of
+`ts/test/feedvalidator.test.ts`).
 
 ## Differences from the TS version
 

@@ -164,6 +164,10 @@ function makeRequire() {
 describe('doc-examples', () => {
   const files = collectMarkdown()
   let testable = 0
+  // A block that carries `// =>` but from which the rewriter extracted no
+  // assertion is a HARNESS defect: the documented example silently stops
+  // being checked. Collect these and fail, rather than dropping them.
+  const dropped = []
 
   for (const file of files) {
     const rel = path.relative(REPO, file)
@@ -173,7 +177,10 @@ describe('doc-examples', () => {
       const joined = b.code.join('\n')
       if (!ARROW.test(joined)) return // no assertions -> skip
       const { code, count } = rewriteAssertions(importsToRequire(joined))
-      if (count === 0) return
+      if (count === 0) {
+        dropped.push(`${rel} block #${bi + 1} (line ${b.startLine})`)
+        return
+      }
       testable++
       const label = `${rel} block #${bi + 1} (line ${b.startLine})`
       it(label, () => {
@@ -185,8 +192,14 @@ describe('doc-examples', () => {
     })
   }
 
-  it('found at least one tested example (sanity)', () => {
-    // Not a hard failure if a repo has no `// =>` examples yet.
-    assert.ok(testable >= 0, `tested ${testable} doc example block(s)`)
+  it('every `// =>` doc block is actually asserted', () => {
+    // `testable >= 0` was true for every possible value — the sanity check
+    // could not fail. The docs DO carry `// =>` examples, so require them.
+    assert.ok(0 < testable, `tested ${testable} doc example block(s)`)
+    assert.deepStrictEqual(
+      dropped,
+      [],
+      `doc blocks with \`// =>\` but no extracted assertion:\n  ${dropped.join('\n  ')}`,
+    )
   })
 })
