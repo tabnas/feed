@@ -269,27 +269,29 @@ Those behaviours are pinned row-by-row, in both runtimes, in
 [`test/spec/xml-layer.tsv`](test/spec/xml-layer.tsv) — the cheap
 proof-of-fix, without needing the corpus.
 
-**Until `@tabnas/xml` publishes, the two CI jobs resolve DIFFERENT `xml`, and
-only the Go one is green.** They are not interchangeable, so read the job name
-before believing a red tick:
+**CI is green on these numbers, because BOTH jobs resolve the sibling `xml`
+from its `main` — not the published package.** `polyglot-ci` clones the deps
+listed in `.github/workflows/ci.yml` and then:
 
-- **`go` job — passes.** `polyglot-ci` clones the sibling repos and runs
-  `go work use` over them, so `xml/go` resolves to `xml`'s **main**, fixes
-  included. The `require github.com/tabnas/xml/go v0.4.1` in `go/go.mod` is
-  overridden by the workspace and never fetched. (`GOWORK=off go test ./...`
-  locally is a different run — that one resolves the published module and
-  fails, which is the point of the section above.)
-- **`ts` job — fails, expected.** The workflow clones and builds the sibling
-  TS packages but never links them into this repo's `node_modules`, and
-  `ts/package.json` asks for `"@tabnas/xml": "*"` with `ts/package-lock.json`
-  pinning the published `0.4.1`. So `npm i` fetches the **registry** build and
-  the suite runs against unfixed `xml`. Measured there: `16/18` must-reject,
-  `1796/1809` must-accept, `1107/1108` detect, and 7 of the 9
-  `TestSpec/xml-layer.tsv` / `parity.test.ts` rows red — i.e. exactly the
-  "was" column above.
+- **`go` job** — runs `go work use` over the clones, so `xml/go` resolves to
+  the sibling checkout. The `require github.com/tabnas/xml/go v0.4.1` in
+  `go/go.mod` is overridden by the workspace and never fetched.
+- **`ts` job** — after `npm i`, a link step replaces each installed
+  `@tabnas/*` with a symlink to the sibling `ts/` (a *copy* on the Windows
+  runner, where unprivileged symlinks are unreliable) and only then builds.
+  So `"@tabnas/xml": "*"` and the `0.4.1` pin in `ts/package-lock.json` are
+  both overridden too.
 
-This clears when `xml` publishes: bump the `require` in `go/go.mod` and the
-lockfile, then delete this paragraph. Do **not** "fix" it here by reverting an
+The **published** versions are still unfixed, so the resolution you are in
+decides the result, and only the local published-resolution runs are red:
+`GOWORK=off go test ./...`, and a `ts/` whose `node_modules/@tabnas/xml` is
+the registry build rather than the symlink. Both give `16/18` must-reject,
+`1796/1809` must-accept, `1107/1108` detect, and 7 of the 9
+`xml-layer.tsv` rows red — exactly the "was" column above. That is expected
+until `@tabnas/xml` publishes; bump the `require` in `go/go.mod` and the
+lockfile then, and delete this paragraph.
+
+Do **not** "fix" a red published-resolution run by reverting an
 `xml-layer.tsv` row, skipping the conformance suites, or repointing a
 devDependency at a local path — all three trade a real signal for a green
 tick.
