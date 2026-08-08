@@ -22,6 +22,7 @@
     "xml"
   ],
   "scripts": {
+    "pretest": "node ../scripts/fetch-corpus.mjs all",
     "test": "node --enable-source-maps --test \"dist-test/*.test.js\"",
     "test-some": "node --enable-source-maps --test-name-pattern=\"$npm_config_pattern\" --test \"dist-test/*.test.js\"",
     "watch": "tsc --build src test -w",

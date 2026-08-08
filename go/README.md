@@ -67,12 +67,23 @@ side; the TypeScript implementation is in [`../ts/`](../ts/).
 ## Testing
 
 ```bash
-go test ./...
+go test -count=1 ./...
 ```
 
-Runs the shared `.tsv` fixtures in [`../test/spec/`](../test/spec/)
-and the vendored well-formed corpus in
-[`../test/feedparser-wellformed/`](../test/feedparser-wellformed/).
+Runs the shared `.tsv` fixtures in [`../test/spec/`](../test/spec/), the
+vendored well-formed corpus in
+[`../test/feedparser-wellformed/`](../test/feedparser-wellformed/), and the
+full `rubys/feedvalidator` conformance corpus. The last is fetched, not
+committed — `make fetch` from the repo root, or let the test fetch it on
+demand. It never skips when the corpus is absent; it fails.
+
+Pass `-count=1`: all three of those live above the Go module root, so Go does
+not treat them as test inputs and would otherwise replay a cached pass.
+
+`go test` here resolves the sibling `@tabnas/xml` checkout via the repo-set
+`go.work`; `GOWORK=off go test` resolves the last published module instead.
+The two are not interchangeable — check with
+`go list -m github.com/tabnas/xml/go`.
 
 ## License
 

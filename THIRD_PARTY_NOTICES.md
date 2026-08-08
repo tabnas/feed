@@ -3,6 +3,12 @@
 This project incorporates material from the projects listed below. The
 original copyright notices and license texts are preserved as required.
 
+Two further corpora are **fetched, not distributed**: `test/feedvalidator/`
+(rubys/feedvalidator) and `test/feedparser/` (the full kurtmckee/feedparser
+tree). `scripts/fetch-corpus.mjs` clones each at a pinned commit into a
+gitignored directory and copies the upstream `LICENSE` alongside it. Neither
+is committed here or shipped in the npm package.
+
 ## kurtmckee/feedparser
 
 A focused subset of well-formed feed samples (`atom10`, `atom`, `rss`,

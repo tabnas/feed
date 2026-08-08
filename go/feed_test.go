@@ -77,7 +77,21 @@ func corpusFiles(t *testing.T, sub string) []string {
 		}
 	}
 	sort.Strings(out)
+	if len(out) == 0 {
+		t.Fatalf("no .xml files under %s: the vendored corpus is truncated", dir)
+	}
 	return out
+}
+
+// The feedparser-wellformed corpus is VENDORED in this repo, so it can never
+// legitimately be absent: skipping on a missing directory would only ever hide
+// a broken checkout behind a green tick.
+func requireWellformed(t *testing.T) {
+	t.Helper()
+	dir := wellformedDir(t)
+	if _, err := os.Stat(dir); err != nil {
+		t.Fatalf("vendored corpus missing at %s: %v", dir, err)
+	}
 }
 
 type expected struct {
@@ -93,9 +107,7 @@ var corpusExpect = map[string]expected{
 }
 
 func TestCorpusDetect(t *testing.T) {
-	if _, err := os.Stat(wellformedDir(t)); err != nil {
-		t.Skip("feedparser-wellformed not vendored")
-	}
+	requireWellformed(t)
 	// Build a raw-format parser by registering the xml plugin directly;
 	// we don't need feed conversion to call Detect.
 	j := jsonic.Make()
@@ -134,9 +146,7 @@ func TestCorpusDetect(t *testing.T) {
 }
 
 func TestCorpusParseAtom(t *testing.T) {
-	if _, err := os.Stat(wellformedDir(t)); err != nil {
-		t.Skip("feedparser-wellformed not vendored")
-	}
+	requireWellformed(t)
 	atomParse := buildParser(t, "atom")
 	for sub := range corpusExpect {
 		sub := sub
@@ -166,9 +176,7 @@ func TestCorpusParseAtom(t *testing.T) {
 // --- targeted value checks (from feedparser comments) ---------------------
 
 func TestCorpusTargets(t *testing.T) {
-	if _, err := os.Stat(wellformedDir(t)); err != nil {
-		t.Skip("feedparser-wellformed not vendored")
-	}
+	requireWellformed(t)
 	atomParse := buildParser(t, "atom")
 
 	cases := []struct {

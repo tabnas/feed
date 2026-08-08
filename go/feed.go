@@ -21,10 +21,22 @@ import (
 const Version = "0.4.1"
 
 // Defaults are merged with caller-supplied options when the plugin is
-// registered via jsonic.UseDefaults. The single supported option is
-// "format" with values "atom" (default), "native", or "raw".
+// registered via jsonic.UseDefaults. Supported options:
+//
+//	"format"            "atom" (default), "native", or "raw"
+//	"strictNamespaces"  bool, default TRUE — enforce Namespaces in XML 1.0
+//
+// strictNamespaces defaults to true here, unlike @tabnas/xml, which defaults
+// it off because bare XML 1.0 well-formedness does not require namespace
+// well-formedness. Feeds are different: Atom is *defined* by its namespace,
+// RSS 1.0 is RDF, and every RSS 2.0 extension (dc:, content:, sy:, georss:)
+// is a prefixed name. An unbound prefix in a feed is a typo or a truncated
+// document, not an extension the reader can pass through — and the W3C Feed
+// Validation Service (rubys/feedvalidator) classifies exactly these
+// documents as SAXError. Set false for the bare-XML behaviour.
 var Defaults = map[string]any{
-	"format": "atom",
+	"format":           "atom",
+	"strictNamespaces": true,
 }
 
 // --- Public types ---------------------------------------------------------
@@ -1225,7 +1237,17 @@ func Feed(j *jsonic.Jsonic, options map[string]any) error {
 	}
 	j.Decorate("feed-init", true)
 
-	if err := j.UseDefaults(xml.Xml, xml.Defaults); err != nil {
+	// See Defaults: feeds are namespace-defined formats, so unlike bare
+	// @tabnas/xml this defaults ON. An absent key means "not supplied",
+	// which is the default (true) — only an explicit false turns it off.
+	strictNamespaces := true
+	if v, ok := options["strictNamespaces"].(bool); ok {
+		strictNamespaces = v
+	}
+
+	if err := j.UseDefaults(xml.Xml, xml.Defaults, map[string]any{
+		"strictNamespaces": strictNamespaces,
+	}); err != nil {
 		return fmt.Errorf("feed: setup xml: %w", err)
 	}
 

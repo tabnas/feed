@@ -35,6 +35,20 @@ type FeedOptions = {
   //   'native' - dialect-specific structure (Atom*/Rss2*/Rss1*)
   //   'raw'    - the XmlElement tree from @tabnas/xml
   format?: FeedFormat
+
+  // Enforce Namespaces in XML 1.0: an element or attribute using an
+  // undeclared prefix (`<dc:language>` with no `xmlns:dc`) is an error.
+  //
+  // Defaults to TRUE here, unlike @tabnas/xml, which defaults it off
+  // because bare XML 1.0 well-formedness does not require namespace
+  // well-formedness. Feeds are different: Atom is *defined* by its
+  // namespace, RSS 1.0 is RDF, and every RSS 2.0 extension (dc:, content:,
+  // sy:, georss:) is a prefixed name. An unbound prefix in a feed is a
+  // typo or a truncated document, not an extension the reader can pass
+  // through — and the W3C Feed Validation Service (rubys/feedvalidator)
+  // classifies exactly these documents as SAXError. Set false for the
+  // bare-XML behaviour.
+  strictNamespaces?: boolean
 }
 
 // Atom (RFC 4287) ----------------------------------------------------------
@@ -911,20 +925,24 @@ function convert(root: XmlElement, opts: Required<FeedOptions>): FeedResult {
 }
 
 function withDefaults(o?: FeedOptions): Required<FeedOptions> {
-  return { format: o?.format ?? 'atom' }
+  return {
+    format: o?.format ?? 'atom',
+    strictNamespaces: o?.strictNamespaces ?? true,
+  }
 }
 
 
 // --- jsonic Plugin --------------------------------------------------------
 
 const Feed: Plugin = function Feed(tn: Tabnas, options) {
+  const opts = withDefaults(options as FeedOptions | undefined)
+
   // `Xml` is still typed against @tabnas/jsonic's `Plugin` (its engine
   // parameter is the legacy callable `Jsonic`), which is nominally — but
   // not structurally — distinct from @tabnas/parser's `Plugin`. The two
   // are runtime-compatible, so bridge the type here without changing
   // behavior.
-  tn.use(Xml as unknown as Plugin)
-  const opts = withDefaults(options as FeedOptions | undefined)
+  tn.use(Xml as unknown as Plugin, { strictNamespaces: opts.strictNamespaces })
 
   // The xml rule's bc fires once per close, including extra times when
   // `r: xml` recurses to consume trailing whitespace. Mirror @xml-bc's

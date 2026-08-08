@@ -134,5 +134,13 @@ also vendored at
 BSD 2-Clause; both languages run the same no-error and targeted value
 checks against it.
 
+Breadth comes from the full
+[`rubys/feedvalidator`](https://github.com/rubys/feedvalidator) corpus — the
+suite behind the W3C Feed Validation Service. It is fetched at a pinned
+commit (never committed) and both languages assert both halves of it: every
+well-formed RSS/Atom document must be accepted with the right dialect, and
+every not-well-formed one must be rejected. See the repo `AGENTS.md` for the
+current numbers.
+
 For the Go port's API shape and its (small) accepted differences, see
 [../../go/doc/concepts.md](../../go/doc/concepts.md).

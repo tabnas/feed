@@ -5,13 +5,24 @@
 # repo-set go.work + node_modules symlinks (admin/scripts/link.sh).
 
 .PHONY: all build test clean build-ts build-go test-ts test-go \
-        clean-ts clean-go publish-ts publish-go tags-go reset
+        clean-ts clean-go publish-ts publish-go tags-go reset fetch
 
 all: build test
 
 build: build-ts build-go
 
-test: test-ts test-go
+test: fetch test-ts test-go
+
+# Fetch the third-party conformance corpora (rubys/feedvalidator and
+# kurtmckee/feedparser) at their pinned commits. They are NEVER committed —
+# see scripts/fetch-corpus.mjs and .gitignore. Idempotent: a corpus already
+# at the pinned SHA is left alone.
+#
+# `make test` runs this FIRST, so the conformance suites can never silently
+# not-run. ts/ also has it as an npm `pretest` (so a bare `npm test` in ts/
+# is safe), and the Go suite auto-fetches on demand.
+fetch:
+	node scripts/fetch-corpus.mjs all
 
 clean: clean-ts clean-go
 
@@ -33,8 +44,13 @@ publish-ts: test-ts
 build-go:
 	cd go && go build ./...
 
-test-go:
-	cd go && go test -v ./...
+# -count=1 disables the Go test cache. The shared fixtures in test/spec/*.tsv,
+# the corpus in test/feedparser-wellformed/ and the fetched conformance corpora
+# all live ABOVE the Go module root, so Go does not track them as test inputs:
+# editing a fixture would otherwise replay a cached "ok ... (cached)" without
+# running the new rows.
+test-go: fetch
+	cd go && go test -count=1 -v ./...
 
 clean-go:
 	cd go && go clean
