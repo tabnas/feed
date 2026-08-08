@@ -170,6 +170,11 @@ describe('feedvalidator: valid documents must be ACCEPTED', () => {
       }
     }
     console.log(`feedvalidator detect: ${checked - fails.length}/${checked} correct dialect`)
+    // `fails` is empty when nothing was checked, too. expectedDialect keys off
+    // the corpus path, so a path-shape change (a Windows separator, an
+    // upstream re-layout) would zero `checked` and pass this test while
+    // asserting nothing. Pin the floor.
+    assert.ok(1000 < checked, `only ${checked} documents classified by directory`)
     assert.deepEqual(fails, [],
       `dialect-detection failures (${fails.length}/${checked}):\n${fmtFails(fails)}`)
   })

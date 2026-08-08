@@ -12,7 +12,7 @@
 // corpus is absent — it never skips.
 
 import { readdirSync, readFileSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 
 // dist-test/ -> ts/ -> repo root
 export const REPO = join(__dirname, '..', '..')
@@ -44,8 +44,17 @@ export function read(p: string): string {
   return readFileSync(p, 'utf8')
 }
 
+// Repo-relative path, ALWAYS with `/` separators — the Go twin does the same
+// via filepath.ToSlash. These strings are used as keys, not just for display:
+// NOT_WELL_FORMED is keyed by `atom/must/....xml` and the dialect check looks
+// for `/testcases/atom/`, both written with `/`. On Windows a raw slice yields
+// backslashes, so every one of those comparisons quietly missed — the
+// NOT_WELL_FORMED guard saw an empty set (which is what turned CI red) and
+// expectedDialect returned null for all 1108 files, silently asserting
+// nothing.
 export function rel(p: string): string {
-  return p.startsWith(REPO) ? p.slice(REPO.length + 1) : p
+  const r = p.startsWith(REPO) ? p.slice(REPO.length + 1) : p
+  return '/' === sep ? r : r.split(sep).join('/')
 }
 
 // The document element's local name, read from the SOURCE TEXT — deliberately

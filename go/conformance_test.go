@@ -318,6 +318,12 @@ func TestFeedValidatorConformance(t *testing.T) {
 			}
 		}
 		fmt.Printf("feedvalidator detect: %d/%d correct dialect\n", checked-len(fails), checked)
+		// fails is also empty when nothing was checked. The want is keyed off
+		// the corpus path, so a path-shape change would zero checked and pass
+		// this test while asserting nothing. Pin the floor.
+		if checked <= 1000 {
+			t.Fatalf("only %d documents classified by directory", checked)
+		}
 		if len(fails) > 0 {
 			t.Fatalf("dialect-detection failures (%d/%d):\n%s", len(fails), checked, fmtFails(fails))
 		}
