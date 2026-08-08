@@ -155,8 +155,8 @@ surfaces as the `Parse` error.
 Go additionally exports `Convert(root any, format string) (any, error)`
 as a public function (the conversion the plugin runs internally). In TS
 the equivalent `convert` is internal; only `Feed` and `detect` are
-exported. Go also exports a `Version` constant mirroring the TS
-package version.
+exported. Both languages export a `VERSION` constant equal to the
+`ts/package.json` version.
 
 ### Known accepted differences
 

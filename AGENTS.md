@@ -28,7 +28,7 @@ exported for callers working with `raw` output.
 | Path | What it is |
 |---|---|
 | [`ts/`](ts/) | **Canonical** TypeScript implementation — the `@tabnas/feed` package. Everything lives in `src/feed.ts` (plugin + types + helpers). No CLI. |
-| [`go/`](go/) | Go port — module `github.com/tabnas/feed/go`. Plugin + helpers in `go/feed.go`; top-level `const Version` mirrors `ts/package.json`. |
+| [`go/`](go/) | Go port — module `github.com/tabnas/feed/go`. Plugin + helpers in `go/feed.go`; top-level `const VERSION` mirrors `ts/package.json`. |
 | [`test/spec/`](test/spec/) | Shared `.tsv` conformance fixtures. Both runtimes auto-discover this dir; the header row's second column name selects what is compared (`expected` = the parse result, `detect` = the dialect report). See [`test/AGENTS.md`](test/AGENTS.md). |
 | [`test/feedparser-wellformed/`](test/feedparser-wellformed/) | Vendored well-formed feed corpus from kurtmckee/feedparser (BSD 2-Clause), in `atom10/` `atom/` `rss/` `rdf/` subdirs. Both runtimes parse these and assert detection. See `THIRD_PARTY_NOTICES.md`. |
 | `test/feedvalidator/`, `test/feedparser/` | The full third-party conformance corpora, **fetched at a pinned commit and gitignored — never committed**. `make fetch` (or `scripts/fetch-feedvalidator.sh` / `scripts/fetch-feedparser.sh`) populates them. |
@@ -180,8 +180,14 @@ the Go harness re-runs the fetcher itself if the corpus is missing — three
 independent paths, because a conformance suite that silently does not run is
 worse than no suite at all.
 
-`make publish-go V=x.y.z` seds `const Version` in `go/feed.go`, commits,
+`make publish-go V=x.y.z` seds `const VERSION` in `go/feed.go`, commits,
 tags `go/vX.Y.Z`, and (when `gh` is present) cuts a release.
+
+Both runtimes bake in a `VERSION` constant — `const VERSION` in `go/feed.go`,
+exported `VERSION` from `ts/src/feed.ts` — and both MUST equal
+`ts/package.json` "version". `go/version_test.go` and
+`ts/test/version.test.ts` fail the build if either drifts. They fail (never
+skip) if `ts/package.json` cannot be read.
 
 ## Tests
 
