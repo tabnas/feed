@@ -115,7 +115,14 @@ function importsToRequire(code) {
 }
 
 // Rewrite `<expr>  // => <expected>` lines into __eq(expr, expected) calls.
-const ARROW = /\/\/\s*=>(.*)$/
+// The `m` flag is load-bearing. This regex is used two ways: per LINE in
+// rewriteAssertions below, and as the opt-in GATE (`ARROW.test(joined)`)
+// against a whole multi-line block. Without `m`, JavaScript's `$` matches
+// only at the very end of the string, so the gate saw an arrow only when
+// `// =>` happened to be on the block's LAST line — every other documented
+// example was silently skipped, and the `dropped` guard below could not
+// catch it because the block never got that far.
+const ARROW = /\/\/\s*=>(.*)$/m
 function rewriteAssertions(code) {
   let count = 0
   const out = code.split('\n').map((line) => {
