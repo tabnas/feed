@@ -1,10 +1,12 @@
 /* Copyright (c) 2021-2026 Richard Rodger and other contributors, MIT License */
 
 // Composition test: the feed grammar plugin layered with the official
-// @tabnas/debug plugin. @tabnas/debug is a devDependency, but this resolves
-// it dynamically and SKIPS when it is absent so the suite stays runnable
-// outside the package; set TABNAS_DEBUG_PATH to point at a sibling
-// checkout's built plugin.
+// @tabnas/debug plugin. @tabnas/debug is a DECLARED devDependency of this
+// package, so it must be present. This used to SKIP when it could not be
+// resolved, which meant a broken install silently removed the whole
+// composition suite while the run still reported green. It now FAILS with
+// instructions instead. Set TABNAS_DEBUG_PATH to point at a sibling
+// checkout's built plugin if it is not installed under node_modules.
 
 import { test, describe } from 'node:test'
 import assert from 'node:assert'
@@ -33,11 +35,17 @@ function loadDebug(): any {
 }
 
 const Debug = loadDebug()
-const skip = Debug ? false : '@tabnas/debug not available (set TABNAS_DEBUG_PATH)'
+if (!Debug) {
+  throw new Error(
+    '\n\n@tabnas/debug could not be resolved, but it is a declared devDependency ' +
+    'of this package and this composition test must not be skipped.\n' +
+    'Install it (npm i in ts/) or set TABNAS_DEBUG_PATH to a built sibling checkout.\n',
+  )
+}
 
 
 describe('compose: feed + @tabnas/debug', () => {
-  test('parses normally with the debug plugin installed', { skip }, () => {
+  test('parses normally with the debug plugin installed', () => {
     const tn = new Tabnas().use(jsonic).use(Feed)
     tn.use(Debug, { print: false, trace: false })
     const f: any = tn.parse(
@@ -47,7 +55,7 @@ describe('compose: feed + @tabnas/debug', () => {
     assert.equal(f.title?.value, 'Hi')
   })
 
-  test('debug.model() returns the structured grammar', { skip }, () => {
+  test('debug.model() returns the structured grammar', () => {
     const tn = new Tabnas().use(jsonic).use(Feed)
     tn.use(Debug, { print: false, trace: false })
     const m: any = tn.debug.model()

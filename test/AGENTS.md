@@ -54,6 +54,26 @@ conformance corpora. They are **fetched** at a pinned commit by
 harness on demand) into gitignored directories — never commit them. They
 cover breadth; keep new behavioural cases here in `spec/` instead.
 
+Each corpus has a runner in both runtimes, and neither may `skip`: if the
+corpus is missing they fail with fetch instructions.
+
+| Corpus | TypeScript | Go |
+|---|---|---|
+| `feedvalidator/` | `ts/test/feedvalidator.test.ts` | `TestFeedValidatorConformance` |
+| `feedparser/` | `ts/test/feedparser-conformance.test.ts` | `TestFeedParserConformance` |
+
+The feedparser runner checks the VALUE each document parses to, against the
+upstream `Expect:` annotation the corpus itself carries (`ts/test/
+expect-eval.ts` and its Go mirror). "It did not throw" is not a conformance
+result. Most of that suite is at 100% and asserted exactly, but the value
+check is a **ratchet**: `VALUE_CORRECT_FLOOR` / `feedParserValueCorrectFloor`
+record what currently holds, and the denominator is floored too so value
+checks cannot be dropped to improve the ratio. Raise both when the parser
+improves; never lower either to get green. The two small sets of known
+disagreements (`ACCEPTED` / `feedParserAcceptedIllformed`, and
+`VERSION_KNOWN_WRONG` / `feedParserVersionKnownWrong`) are asserted to be
+EXACT — fixing one of those cases is red until its entry is deleted.
+
 ## Rules
 
 - Prefer adding a fixture here over a one-off in-language assertion when a
