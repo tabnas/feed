@@ -23,7 +23,11 @@ Blank lines are skipped, and so are comment lines — a line starting with
 The **second column's header name selects what the runner compares**:
 
 - `expected` — the parse result, as a JSON value, or `ERROR` /
-  `ERROR:<substring>` for inputs that must fail.
+  `ERROR:<substring>` for inputs that must fail. Unlike most of the fleet
+  the text after the colon is a fragment of the MESSAGE, not an error
+  code: these rejections come from the feed layer's own validation, which
+  says what is wrong in prose rather than through a code the engine
+  assigns. A bare `ERROR` accepts any failure.
 - `detect` — the `{ dialect, version }` report for the input, computed from
   the raw element tree. The runner forces `{"format":"raw"}` for these files
   and ignores the `opts` column.
@@ -37,12 +41,23 @@ class identity of the feed structs do not affect the comparison.
 
 ## Who runs what
 
-- TypeScript: `ts/test/parity.test.ts` — reads `../../test/spec` at runtime
-  from `dist-test/`, one `describe` per file.
-- Go: `go/parity_test.go` — `TestSpec` globs `../test/spec/*.tsv`.
+- TypeScript: `ts/test/parity.test.ts` — a `makeRunner(...)` per fixture.
+- Go: `go/parity_test.go` — a `support.Runner{...}` per fixture.
+
+One runner per FILE, not one over the directory, because the second
+column's header (`expected` or `detect`) says what the file asserts. Both
+hold only what is specific to feed: that, how to build the parser for a
+row's options, and the message matching above. Everything else — finding `test/spec`,
+reading the file, decoding escapes, the `ERROR:` contract, the comparison,
+the `<file>:<line>` in a failure message — comes from
+[`@tabnas/support`](https://github.com/tabnas/support) and its Go half, so
+the two loaders cannot drift from each other either.
 
 Both discover files by directory listing: adding a `.tsv` here runs it in
-both runtimes without touching either runner.
+both runtimes without touching either runner. An empty fixture, and a spec
+directory with no fixtures in it, both **fail** — a runner that reports
+green having run nothing is indistinguishable from coverage that was never
+there.
 
 `test/feedparser-wellformed/` is a separate, larger third-party corpus used
 for smoke coverage (`TestCorpus*` / `feedparser.test.ts`), not for pinning
