@@ -4,6 +4,7 @@ go 1.24.7
 
 require (
 	github.com/tabnas/jsonic/go v0.6.2
+	github.com/tabnas/support/go v0.3.0
 	github.com/tabnas/xml/go v0.7.2
 )
 

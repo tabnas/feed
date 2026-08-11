@@ -1,121 +1,77 @@
-/* Copyright (c) 2021-2025 Richard Rodger and other contributors, MIT License */
+/* Copyright (c) 2025 Richard Rodger and other contributors, MIT License */
 
 // Cross-runtime conformance, driven by the shared `test/spec/*.tsv` fixtures
-// at the repo root — the same convention @tabnas/parser and @tabnas/abnf use
-// (see ../../test/AGENTS.md).
+// at the repo root (see ../../test/AGENTS.md).
 //
-// `go/parity_test.go` discovers and runs the SAME files, so the two
-// implementations cannot drift without one of them going red.
-
-import { describe, test } from 'node:test'
-import assert from 'node:assert'
-import { readFileSync, readdirSync } from 'node:fs'
-import { join } from 'node:path'
+// The fixture loader, the escape codec, the `ERROR:` contract and the row
+// loop all come from @tabnas/support, whose Go half `go/parity_test.go`
+// uses to run the SAME files — so the two implementations cannot drift
+// without one of them going red, and neither can the two loaders.
+//
+// What is left here is only what is specific to feed: the two fixture
+// modes, and what an `ERROR:` cell means.
 
 import { Tabnas } from '@tabnas/parser'
 import { jsonic } from '@tabnas/jsonic'
-import { Feed, detect } from '../dist/feed.js'
+import { findSpecDir, loadSpecDir, makeRunner } from '@tabnas/support'
 
-// At runtime this file is loaded from `dist-test/`, so hop up one level to
-// reach the shared spec directory in the repo root.
-const specDir = join(__dirname, '..', '..', 'test', 'spec')
+import { Feed, detect } from '../dist/feed'
 
-type SpecRow = { line: number; input: string; expected: string; opts: string }
-type Spec = { mode: 'expected' | 'detect'; rows: SpecRow[] }
-
-// Decode the escape set used in non-JSON columns. Kept byte-identical to the
-// Go loader so both runtimes feed the parser the exact same source text.
-function unescape(s: string): string {
-  if (!s.includes('\\')) return s
-  let out = ''
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i]
-    if (c === '\\' && i + 1 < s.length) {
-      const n = s[i + 1]
-      if (n === 'n') { out += '\n'; i++; continue }
-      if (n === 'r') { out += '\r'; i++; continue }
-      if (n === 't') { out += '\t'; i++; continue }
-      if (n === '\\') { out += '\\'; i++; continue }
-    }
-    out += c
+// Flatten through JSON so class identity, property order and — the one
+// that matters here — keys whose value is `undefined` do not affect the
+// structural comparison. The feed model sets absent fields explicitly, and
+// `{a: 1, b: undefined}` is not the same object as `{a: 1}` to a
+// key-counting comparison, though it renders identically. The same
+// normalisation go/parity_test.go does.
+//
+// `undefined` itself is left alone: a fixture that says `null` must still
+// not be satisfied by a parse that produced nothing.
+function jsonFlatten(v: unknown): unknown {
+  if (undefined === v) return v
+  try {
+    return JSON.parse(JSON.stringify(v))
   }
-  return out
-}
-
-// The header row names the columns, and its second name selects what the
-// runner compares: `expected` is the parse result, `detect` is the dialect
-// report for the raw element tree.
-function loadSpec(file: string): Spec {
-  const body = readFileSync(join(specDir, file), 'utf8')
-  const lines = body.split(/\r?\n/)
-  const header = (lines[0] ?? '').split('\t')
-  const mode = header[1] === 'detect' ? 'detect' : 'expected'
-  const rows: SpecRow[] = []
-  for (let i = 1; i < lines.length; i++) {
-    const raw = lines[i]
-    // A comment line starts with '#' and has no tab; a data row always has
-    // at least one (input + expected), so '#'-leading sources still work.
-    if (raw === '' || (raw.startsWith('#') && !raw.includes('\t'))) continue
-    const cols = raw.split('\t')
-    if (cols.length < 2) {
-      throw new Error(`${file}:${i + 1}: expected at least 2 tab-separated columns`)
-    }
-    rows.push({
-      line: i + 1,
-      input: unescape(cols[0]),
-      expected: cols[1],
-      opts: cols[2] ?? '',
-    })
+  catch {
+    return v
   }
-  return { mode, rows }
 }
 
-// A truncated single-line rendering of the input, so a failure names its case.
-function label(s: string): string {
-  const one = s.replace(/\s+/g, ' ').trim()
-  return 60 < one.length ? one.slice(0, 57) + '...' : one
-}
+// A fixture's SECOND COLUMN HEADER says what it asserts: `expected` is the
+// parsed feed, `detect` is the format name the raw parse is recognised as.
+// That is per file, which is why there is a runner per file rather than
+// one over the directory.
+for (const spec of loadSpecDir(findSpecDir(__dirname))) {
+  const mode = spec.header[1]
+  if ('expected' !== mode && 'detect' !== mode) {
+    throw new Error(
+      `${spec.file}: unknown second column ${JSON.stringify(mode)}`)
+  }
 
-function runSpec(file: string) {
-  const { mode, rows } = loadSpec(file)
-  describe('spec: ' + file, () => {
-    assert.ok(0 < rows.length, file + ': no cases')
-    for (const row of rows) {
-      test(`row ${row.line}: ${label(row.input)}`, () => {
-        const opts = '' === row.opts.trim() ? {} : JSON.parse(row.opts)
-        const tn = new Tabnas().use(jsonic).use(
-          Feed, 'detect' === mode ? { format: 'raw' } : opts)
+  makeRunner({
+    parse: (input, row) => {
+      const raw = row.named('opts')
+      const opts = '' === raw.trim() ? {} : JSON.parse(raw)
 
-        if (row.expected.startsWith('ERROR')) {
-          const want = row.expected.slice('ERROR'.length).replace(/^:/, '')
-          assert.throws(
-            () => tn.parse(row.input),
-            (err: Error) => '' === want || err.message.includes(want),
-            `${file}:${row.line}: expected ${row.expected}`,
-          )
-          return
-        }
+      // Detection is asserted over the RAW parse, so those fixtures pin
+      // the format rather than passing their own options.
+      const parsed = new Tabnas()
+        .use(jsonic)
+        .use(Feed, 'detect' === mode ? { format: 'raw' } : opts)
+        .parse(input)
 
-        const parsed = tn.parse(row.input)
-        const value = 'detect' === mode ? detect(parsed as any) : parsed
+      return 'detect' === mode ? detect(parsed as any) : parsed
+    },
 
-        // A fixture that says `null` must not be satisfied by a parse that
-        // produced nothing: the two are different results.
-        assert.notStrictEqual(value, undefined,
-          `${file}:${row.line}: no value; expected ${row.expected}`)
+    // feed's `ERROR:<want>` cells hold a fragment of the MESSAGE — 'unrecognized
+    // root element "kml"', 'character data is not allowed outside the root
+    // element' — rather than an error code. These rejections come from the
+    // feed layer's own validation, which reports what is wrong in prose
+    // rather than through a code the engine assigns. A bare `ERROR` still
+    // accepts any failure.
+    matchError: (err: any, want) => String(err?.message).includes(want),
 
-        // Round-trip through JSON so class identity and property order do not
-        // affect the structural comparison.
-        const got = JSON.parse(JSON.stringify(value))
-        assert.deepStrictEqual(got, JSON.parse(row.expected),
-          `${file}:${row.line}`)
-      })
-    }
-  })
-}
+    normalize: jsonFlatten,
 
-// Auto-discover every fixture: adding a .tsv runs it in both runtimes
-// without touching either runner.
-for (const file of readdirSync(specDir).sort()) {
-  if (file.endsWith('.tsv')) runSpec(file)
+    expected: mode,
+  }).spec(spec)
 }
