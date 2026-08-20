@@ -201,16 +201,28 @@ make build && make test      # both runtimes; `make test` runs `make fetch` firs
 Narrower, when iterating:
 
 ```bash
-(cd ts && npm run build && npm test)   # build first: `pretest` fetches the corpora but does NOT compile
+(cd ts && npm test)                    # `pretest` builds, then fetches the corpora
 (cd go && go test -count=1 ./...)      # ALWAYS -count=1 — the fixtures live above the module root
 ```
 
-Each line is a subshell, and the TS one builds before testing on purpose:
-`npm test` runs the compiled `dist-test/*.test.js`, so run alone on a fresh
-checkout it either fails for want of `dist-test/` or silently passes against
-stale output. On the Go side never drop `-count=1`, and remember that
-`GOWORK=off` is a different run — it resolves the *published* `@tabnas/xml`,
-not the sibling (see "Build & test" above).
+Each line is a subshell. `npm test` compiles first — its `pretest` runs
+`npm run build` before the corpus fetch — so the suite always reports on
+what you edited. The focused runners have their own hooks, because npm
+runs `pre<name>` only for the matching name — `test-some` would otherwise
+still run the previous artifact. On the Go side never drop `-count=1`, and
+remember that `GOWORK=off` is a different run — it resolves the
+*published* `@tabnas/xml`, not the sibling (see "Build & test" above).
+
+That was not always true, and it is worth knowing why the line above no
+longer says `npm run build && npm test`. `pretest` existed but only
+fetched the corpora — it compiled nothing. So `npm test` ran the
+`dist-test/*.test.js` left over from last time: on a fresh checkout it
+failed for want of `dist-test/`, and on a stale one it passed against the
+previous build. This file documented that hazard and asked contributors to
+work around it by hand. Documenting a trap is not fixing it, and here it
+is what kept the trap alive — the paragraph made a defect read as an
+accepted condition. The wiring is fixed instead, and `make
+ax-stale-test-artifact` in tabnas/admin keeps it fixed.
 
 What "correct" means here, in order of authority:
 
