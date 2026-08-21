@@ -15,6 +15,8 @@ feeds from any source. It is a plugin for the
 of [`@tabnas/xml`](https://github.com/tabnas/xml), and ships in two
 languages with identical output.
 
+Docs, guides, the error reference and the playground: **[tabnas.dev](https://tabnas.dev)**.
+
 ## Install
 
 ```bash
