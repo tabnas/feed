@@ -1,7 +1,7 @@
 # @tabnas/feed
 
 A plugin for the [`tabnas`](https://github.com/tabnas/parser) parsing
-engine — built on [`@tabnas/xml`](https://github.com/tabnas/xml) — that
+engine (built on [`@tabnas/xml`](https://github.com/tabnas/xml)) that
 parses syndication feeds (**RSS 0.90, 0.91, 0.92, 1.0, 2.0** and **Atom
 0.3, 1.0**) into a typed structure. By default every dialect is
 normalised to an Atom-shaped result, so the same downstream code can
@@ -33,7 +33,7 @@ feed.title    // => { type: 'text', value: 'My Blog' }
 feed.format   // => 'atom'
 ```
 
-The input was RSS 2.0 but the result is in Atom shape — `title` is an
+The input was RSS 2.0 but the result is in Atom shape: `title` is an
 `AtomText` (`{ type, value }`), and the whole object follows RFC 4287.
 Pass `{ format: 'native' }` to keep the source dialect's structure, or
 `{ format: 'raw' }` for the underlying `XmlElement` tree.
@@ -42,12 +42,12 @@ Pass `{ format: 'native' }` to keep the source dialect's structure, or
 
 Full docs follow the four [Diátaxis](https://diataxis.fr) quadrants:
 
-- [Tutorial](doc/tutorial.md) — your first feed parse, step by step.
-- [How-to guide](doc/guide.md) — recipes: native shape, raw tree,
+- [Tutorial](doc/tutorial.md). Your first feed parse, step by step.
+- [How-to guide](doc/guide.md). Recipes: native shape, raw tree,
   dialect detection, error handling.
-- [Reference](doc/reference.md) — the API, the `format` option, the
+- [Reference](doc/reference.md). The API, the `format` option, the
   Atom/native types, mapping tables, and the accepted grammar.
-- [Concepts](doc/concepts.md) — why it defaults to Atom, what
+- [Concepts](doc/concepts.md). Why it defaults to Atom, what
   conversion loses, and how it rides on `@tabnas/xml`.
 
 The Go port lives in [`../go/`](../go/) with its own

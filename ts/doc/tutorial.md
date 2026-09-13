@@ -1,8 +1,8 @@
-# Tutorial — your first feed parse
+# Tutorial: your first feed parse
 
 This walks you from nothing to a parsed feed, then shows you the one
 idea that makes `@tabnas/feed` useful: whatever dialect you feed in,
-you get the *same* Atom-shaped object out. Follow it in order — each
+you get the *same* Atom-shaped object out. Follow it in order; each
 step builds on the last.
 
 For a recipe-style index of individual tasks, see the
@@ -61,7 +61,7 @@ const j = new Tabnas().use(jsonic).use(Feed)
 const result = j.parse(rssSource) as AtomFeed
 ```
 
-## 3. Read the result — it is Atom-shaped
+## 3. Read the result: it is Atom-shaped
 
 You handed in **RSS 2.0**, but `result` came back in **Atom shape**.
 That is the whole point: the plugin normalises every dialect to one
@@ -69,7 +69,7 @@ structure so the rest of your code never branches on the source format.
 
 Notice three things in the output above:
 
-- `result.title` is an `AtomText` — `{ type, value }` — not a bare
+- `result.title` is an `AtomText`: `{ type, value }`. Not a bare
   string. Atom text carries its content type (`text`, `html`, or
   `xhtml`).
 - The RSS `<guid>` became the entry's stable `id`.
@@ -92,7 +92,7 @@ result.entries[0].id           // => 'https://example.com/1'
 result.entries[0].links[0]     // => { href: 'https://example.com/1', rel: 'alternate' }
 ```
 
-## 4. Parse a different dialect — same shape out
+## 4. Parse a different dialect: same shape out
 
 Now hand in an **Atom 1.0** document. The output object has the same
 shape, so your reading code does not change:
@@ -145,9 +145,9 @@ The recognised root elements are `<feed>` (Atom), `<rss>` (RSS
 
 ## Where to go next
 
-- [How-to guide](guide.md) — focused recipes (native shape, raw tree,
+- [How-to guide](guide.md). Focused recipes (native shape, raw tree,
   dialect detection, error handling).
-- [Reference](reference.md) — every option, the full Atom/native
+- [Reference](reference.md). Every option, the full Atom/native
   types, the dialect mapping tables, and the accepted grammar.
-- [Concepts](concepts.md) — why it defaults to Atom, what conversion
+- [Concepts](concepts.md). Why it defaults to Atom, what conversion
   loses, and how the plugin rides on `@tabnas/xml`.

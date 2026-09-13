@@ -1,7 +1,7 @@
 # Concepts (Go)
 
 Background on how the `feed` Go package is put together, and why. This
-is understanding-oriented reading — for steps see the
+is understanding-oriented reading; for steps see the
 [tutorial](tutorial.md) and [how-to guide](guide.md), and for exact
 signatures, options, and the grammar see the [reference](reference.md).
 
@@ -15,7 +15,7 @@ Go API and value types differ.
 parser (which wraps the `tabnas` engine), but it is an unusual one: it
 adds **no rules and no tokens** of its own. All the syntax it accepts is
 the XML grammar from [`github.com/tabnas/xml/go`](https://github.com/tabnas/xml)
-— the `xml`, `element`, `content`, and `child` rules.
+It supplies the `xml`, `element`, `content`, and `child` rules.
 
 When you register it, `Feed`:
 
@@ -27,8 +27,8 @@ When you register it, `Feed`:
 That action fires after the XML plugin has built the element tree. It
 reads the root element, decides the dialect, and replaces the parse
 result with the converted feed value. All the RSS/Atom knowledge lives
-in plain helper functions over `map[string]any` element trees —
-`Detect`, `parseAtom`, `parseRss2`, `rss2ToAtom`, and friends — not in
+in plain helper functions over `map[string]any` element trees
+(`Detect`, `parseAtom`, `parseRss2`, `rss2ToAtom`, and friends) not in
 grammar rules.
 
 ## Three tiers, one option
@@ -42,7 +42,7 @@ src ──► xml plugin ───► native parser ───► Atom converter
         format:"raw"      format:"native"  format:"atom"  (default)
 ```
 
-- `"raw"` returns the `map[string]any` tree untouched — no detection,
+- `"raw"` returns the `map[string]any` tree untouched, with no detection
   no conversion. Use it for namespace extensions the feed structs do
   not model, or to call `Detect` yourself.
 - `"native"` runs the dialect-specific parser and stops: an
@@ -66,13 +66,13 @@ code can ignore the source dialect entirely.
 Mapping RSS to Atom is not bijective. The default `"atom"` conversion
 deliberately drops fields with no Atom counterpart:
 
-- `TTL`, `Cloud`, `SkipHours`, `SkipDays` — RSS 2.x channel-level
+- `TTL`, `Cloud`, `SkipHours`, `SkipDays`. RSS 2.x channel-level
   scheduling hints.
-- `Guid.IsPermaLink` — the value becomes `Entries[i].ID`, but the
+- `Guid.IsPermaLink`. The value becomes `Entries[i].ID`, but the
   boolean is dropped.
-- `Image.Title`, `Image.Link`, `Image.Width`, `Image.Height` — Atom's
+- `Image.Title`, `Image.Link`, `Image.Width`, `Image.Height`. Atom's
   `Logo` is just a URL.
-- `TextInput` — an obsolete RSS UI element with no Atom counterpart.
+- `TextInput`. An obsolete RSS UI element with no Atom counterpart.
 - `Category.Domain` becomes `Category.Scheme`, losing the RSS naming.
 
 If any of these matter, parse with `format: "native"` and read the
@@ -84,7 +84,7 @@ The plugin is liberal about *what* it parses and strict about the *root
 element*:
 
 - **Accepted roots**: `<feed>`, `<rss>`, `<RDF>`. Detection within
-  those is forgiving — a missing/unknown `rss` `version` defaults to
+  those is forgiving: a missing or unknown `rss` `version` defaults to
   RSS 2.0; an `RDF` defaults to RSS 1.0 unless the channel carries the
   Netscape 0.90 namespace; a `feed` defaults to Atom 1.0 unless it
   carries the Atom 0.3 namespace.
@@ -96,8 +96,8 @@ element*:
 
 A correctness detail: the XML grammar can fire the `xml` rule's close
 phase more than once (for example when trailing whitespace makes the
-rule recurse). The conversion action guards on `r.Child.Node` — the
-same idiom the XML plugin's own `@xml-bc` uses — so it runs exactly
+rule recurse). The conversion action guards on `r.Child.Node` (the
+same idiom the XML plugin's own `@xml-bc` uses) so it runs exactly
 once, on the iteration that produced the element.
 
 ## JSON-shape parity with the TypeScript implementation
@@ -114,7 +114,7 @@ vendored well-formed corpus in
 [kurtmckee/feedparser](https://github.com/kurtmckee/feedparser)) is run
 by both languages too, as is the full
 [rubys/feedvalidator](https://github.com/rubys/feedvalidator) conformance
-corpus — fetched at a pinned commit rather than committed, and asserted on
+corpus, fetched at a pinned commit rather than committed, and asserted on
 both halves (`go/conformance_test.go`, the twin of
 `ts/test/feedvalidator.test.ts`).
 
@@ -144,7 +144,7 @@ surfaces as the `Parse` error.
 | ----------------- | ----------------------------------- | ----------------------------------- |
 | Result            | union `AtomFeed \| Rss2Feed \| Rss1Feed \| XmlElement` | `any` (type-assert to the concrete struct) |
 | Raw tree element  | `XmlElement` (object with methods)  | `map[string]any`                    |
-| Optional sub-objects | optional object fields (`title?`) | pointer fields (`*AtomText`), `nil` when absent — always nil-check |
+| Optional sub-objects | optional object fields (`title?`) | pointer fields (`*AtomText`), `nil` when absent, so always nil-check |
 | Optional scalars  | omitted keys (`undefined`)          | zero values + `omitempty` JSON tags |
 | `entry.source`    | `Partial<AtomFeed>`                 | a dedicated `AtomEntrySource` struct (no `Entries`) |
 | `guid.isPermaLink`| `boolean` (optional)                | `*bool` (`nil` when the attribute is absent) |

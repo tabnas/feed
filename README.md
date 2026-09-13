@@ -29,7 +29,7 @@ go get github.com/tabnas/feed/go
 
 ## One tiny example
 
-**TypeScript** — hand in RSS, get Atom shape out:
+**TypeScript.** Hand in RSS, get Atom shape out:
 
 ```ts
 import { Tabnas } from '@tabnas/parser'
@@ -43,7 +43,7 @@ feed.title    // { type: 'text', value: 'My Blog' }
 feed.format   // 'atom'
 ```
 
-**Go** — the same, returning a typed struct:
+**Go.** The same, returning a typed struct:
 
 ```go
 j := tabnasjsonic.Make()
@@ -53,7 +53,7 @@ f := got.(tabnasfeed.AtomFeed)
 fmt.Println(f.Title.Value) // My Blog
 ```
 
-The input was RSS 2.0 but the result is in Atom shape — `title` is an
+The input was RSS 2.0 but the result is in Atom shape: `title` is an
 `AtomText` (`{ type, value }`), and the whole object follows RFC 4287.
 Pass `{ format: 'native' }` to keep the source dialect's structure, or
 `{ format: 'raw' }` for the underlying XML element tree.
@@ -68,14 +68,14 @@ Namespaces in XML 1.0 by default: an undeclared prefix such as
 RSS/Atom have no single canonical test suite. The authoritative third-party
 corpus is **rubys/feedvalidator**, the suite behind the W3C Feed Validation
 Service, and the whole `testcases/` tree is wired into this repo's `make
-test` — both halves asserted, in TypeScript and Go:
+test`, with both halves asserted, in TypeScript and Go:
 
 - 1809/1809 well-formed RSS/Atom documents accepted;
 - 1108/1108 with the dialect the corpus directory says they are;
 - 18/18 not-well-formed documents rejected.
 
 Separately, 1734/1734 (100%) of the RSS/Atom-rooted well-formed documents in
-**kurtmckee/feedparser** parse to an Atom shape — measured, but not yet
+**kurtmckee/feedparser** parse to an Atom shape: measured, but not yet
 asserted by a committed harness.
 
 See [`AGENTS.md`](AGENTS.md#conformance-what-is-actually-verified) for how
@@ -108,7 +108,7 @@ Language hubs: [`ts/README.md`](ts/README.md) and
 
 ## Grammar diagram
 
-`@tabnas/feed` contributes no grammar of its own — the accepted syntax
+`@tabnas/feed` contributes no grammar of its own; the accepted syntax
 is the XML grammar from `@tabnas/xml`. The installed grammar as a
 railroad / syntax diagram, generated with
 [`@tabnas/railroad`](https://github.com/tabnas/railroad):

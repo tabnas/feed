@@ -32,7 +32,7 @@ feed.format        // => 'atom'
 feed.version       // => '1.0'
 ```
 
-The instance is reusable — call `j.parse(...)` as many times as you
+The instance is reusable: call `j.parse(...)` as many times as you
 like.
 
 ## Keep the source dialect's structure
@@ -78,8 +78,8 @@ const native = j.parse(rssSource) as Rss2Feed
 
 ## Access the raw XML tree
 
-When even the native shape is not enough — for example you need a
-non-standard namespace extension like `<media:content>` — drop down to
+When even the native shape is not enough (for example you need a
+non-standard namespace extension like `<media:content>`) drop down to
 the raw element tree from `@tabnas/xml` with `format: 'raw'`:
 
 ```js
@@ -117,15 +117,15 @@ detect(atom)  // => { dialect: 'atom', version: 'atom10' }
 ```
 
 An unrecognised root returns `{ dialect: 'unknown', version: 'unknown' }`
-rather than throwing — `detect` never raises.
+rather than throwing; `detect` never raises.
 
 ## Handle parse errors
 
 A failed parse throws. Two kinds of failure can occur:
 
-- **XML-level** — malformed markup (unterminated tag, mismatched
+- **XML-level**. Malformed markup (unterminated tag, mismatched
   close) is rejected by `@tabnas/xml` before the feed conversion runs.
-- **Feed-level** — a well-formed XML document whose root is not
+- **Feed-level**. A well-formed XML document whose root is not
   `<feed>`, `<rss>`, or `<RDF>` throws
   `unrecognized root element ...`.
 
@@ -150,6 +150,6 @@ try {
 The default conversion is lossy by design. If your application needs
 both the convenient Atom shape *and* a stray RSS-only field, the
 recommended path is to register the plugin with `format: 'native'` and
-do any Atom-style mapping in your own code only where you need it —
+do any Atom-style mapping in your own code only where you need it;
 that way you never lose a field you might want. Parsing the same source
 twice (once per format) also works but does the XML lexing twice.
