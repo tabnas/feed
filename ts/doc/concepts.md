@@ -1,7 +1,7 @@
 # Concepts
 
 Background on how `@tabnas/feed` is put together, and why. This is
-understanding-oriented reading — for steps see the
+understanding-oriented reading; for steps see the
 [tutorial](tutorial.md) and [how-to guide](guide.md), and for exact
 signatures, options, and the grammar see the [reference](reference.md).
 
@@ -11,7 +11,7 @@ signatures, options, and the grammar see the [reference](reference.md).
 [`tabnas`](https://github.com/tabnas/parser) parsing engine, but it is
 an unusual one: it adds **no rules and no tokens** of its own. All the
 syntax it accepts is the XML grammar from
-[`@tabnas/xml`](https://github.com/tabnas/xml) — the `xml`, `element`,
+[`@tabnas/xml`](https://github.com/tabnas/xml): the `xml`, `element`,
 `content`, and `child` rules, and the `XOP` / `XCL` / `XSC` / `TX`
 tokens.
 
@@ -24,8 +24,8 @@ What the plugin actually does, when you `.use(Feed)`, is:
 That callback fires after `@tabnas/xml` has built the element tree.
 It reads the root element, decides what dialect it is, and replaces the
 parse result with the converted feed object. All the RSS/Atom knowledge
-lives in plain helper functions over `XmlElement` values — `detect`,
-`parseAtom`, `parseRss2`, `rss2ToAtom`, and friends — not in grammar
+lives in plain helper functions over `XmlElement` values (`detect`,
+`parseAtom`, `parseRss2`, `rss2ToAtom`, and friends) not in grammar
 rules. This is why the [grammar diagram](grammar.svg) is the XML
 grammar's diagram: there is nothing else to draw.
 
@@ -40,7 +40,7 @@ src ──► @tabnas/xml ──► native parser ──► Atom converter
         format:'raw'    format:'native'   format:'atom'  (default)
 ```
 
-- `'raw'` returns the `XmlElement` tree untouched — no detection, no
+- `'raw'` returns the `XmlElement` tree untouched. No detection, no
   conversion. Use it for namespace extensions the feed types do not
   model, or to call `detect` yourself.
 - `'native'` runs the dialect-specific parser and stops: you get an
@@ -59,7 +59,7 @@ Atom 1.0 (RFC 4287) is, in practice, a strict superset of what every
 flavour of RSS expresses, with consistent typed elements: `AtomText`
 carries its content type, `AtomLink` carries `rel` / `type` / `length`,
 and dates are well defined. RSS, by contrast, is a small family of
-related but inconsistent formats — RSS 0.91 has no `guid`, 0.92 added
+related but inconsistent formats: RSS 0.91 has no `guid`, 0.92 added
 `enclosure` and `category`, 1.0 is RDF, 2.0 added `cloud` and `ttl`.
 
 Picking one shape for downstream code to target avoids per-dialect
@@ -74,13 +74,13 @@ minority that genuinely needs RSS-only metadata opts into
 Mapping RSS to Atom is not bijective. The default `'atom'` conversion
 deliberately drops fields that have no Atom counterpart:
 
-- `ttl`, `cloud`, `skipHours`, `skipDays` — RSS 2.x channel-level
+- `ttl`, `cloud`, `skipHours`, `skipDays`. RSS 2.x channel-level
   scheduling hints; Atom has no equivalent.
-- `guid/@isPermaLink` — the value becomes `entry.id`, but the boolean
+- `guid/@isPermaLink`. The value becomes `entry.id`, but the boolean
   flag is dropped.
-- `image/title`, `image/link`, `image/width`, `image/height` — Atom's
+- `image/title`, `image/link`, `image/width`, `image/height`. Atom's
   `logo` is just a URL.
-- `textInput` — an obsolete RSS UI element with no Atom counterpart.
+- `textInput`. An obsolete RSS UI element with no Atom counterpart.
 - `category/@domain` becomes `category.scheme` (the intended mapping),
   which loses the original RSS naming.
 
@@ -95,14 +95,14 @@ The plugin is liberal about *what* it parses and strict about the *root
 element*:
 
 - **Accepted roots**: `<feed>`, `<rss>`, `<RDF>`. Within those,
-  detection is forgiving — a missing or unknown `rss` `@version`
+  detection is forgiving: a missing or unknown `rss` `@version`
   defaults to RSS 2.0; an `RDF` defaults to RSS 1.0 unless the channel
   carries the Netscape 0.90 namespace; a `feed` defaults to Atom 1.0
   unless it carries the Atom 0.3 namespace.
 - **Rejected**: any other root element throws
   `unrecognized root element ...`. The one exception is
   `format: 'raw'`, which returns the tree without ever calling
-  detection — so you can inspect or reject unknown documents yourself.
+  detection, so you can inspect or reject unknown documents yourself.
 - **XML errors come first**: malformed markup (an unterminated tag, a
   mismatched close) is rejected by `@tabnas/xml` during lexing/parsing,
   before the feed conversion ever runs. Feed-level errors only happen
@@ -111,7 +111,7 @@ element*:
 A subtle correctness detail: the XML grammar can fire the `xml` rule's
 close phase more than once (for example when trailing whitespace makes
 the `xml` rule recurse). The conversion callback guards on
-`rule.child.node` — the same idiom `@xml-bc` uses — so it runs exactly
+`rule.child.node` (the same idiom `@xml-bc` uses) so it runs exactly
 once, on the iteration that actually produced the element. Without that
 guard, the already-converted result would be fed back through
 `detect`/`convert` a second time.
@@ -135,7 +135,7 @@ BSD 2-Clause; both languages run the same no-error and targeted value
 checks against it.
 
 Breadth comes from the full
-[`rubys/feedvalidator`](https://github.com/rubys/feedvalidator) corpus — the
+[`rubys/feedvalidator`](https://github.com/rubys/feedvalidator) corpus, the
 suite behind the W3C Feed Validation Service. It is fetched at a pinned
 commit (never committed) and both languages assert both halves of it: every
 well-formed RSS/Atom document must be accepted with the right dialect, and

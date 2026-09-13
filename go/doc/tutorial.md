@@ -1,4 +1,4 @@
-# Tutorial — your first feed parse (Go)
+# Tutorial: your first feed parse (Go)
 
 This walks you from an empty Go module to a parsed feed, then shows the
 one idea that makes `feed` useful: whatever dialect you feed in, you
@@ -6,8 +6,8 @@ get the *same* Atom-shaped struct out. Follow it in order.
 
 For a recipe-style index of individual tasks, see the
 [how-to guide](guide.md). For exhaustive signatures, options, and the
-grammar, see the [reference](reference.md). For how it works — and how
-it differs from the TypeScript version — see [concepts](concepts.md).
+grammar, see the [reference](reference.md). For how it works (and how
+it differs from the TypeScript version) see [concepts](concepts.md).
 
 ## 1. Install
 
@@ -65,7 +65,7 @@ func main() {
 }
 ```
 
-## 3. Read the result — it is Atom-shaped
+## 3. Read the result: it is Atom-shaped
 
 You handed in **RSS 2.0**, but `f` came back as an `AtomFeed`. That is
 the whole point: the plugin normalises every dialect to one struct so
@@ -73,16 +73,16 @@ the rest of your code never branches on the source format.
 
 Notice three things in the output:
 
-- `f.Title` is an `*tabnasfeed.AtomText` — it carries a content type
+- `f.Title` is an `*tabnasfeed.AtomText`. It carries a content type
   (`Type: "text"`) alongside its `Value`, not a bare string.
 - The RSS `<guid>` became `f.Entries[0].ID`.
 - The RSS `<link>` became an `AtomLink` with `Rel: "alternate"`.
 
 `Parse` returns `(any, error)`. Type-assert the result to the concrete
-type for the format you chose — with the default `format`, that is
+type for the format you chose: with the default `format`, that is
 `tabnasfeed.AtomFeed`.
 
-## 4. Parse a different dialect — same struct out
+## 4. Parse a different dialect: same struct out
 
 Hand in an **Atom 1.0** document. The output struct is the same type,
 so your reading code does not change:
@@ -130,9 +130,9 @@ The recognised root elements are `<feed>` (Atom), `<rss>` (RSS
 
 ## Where to go next
 
-- [How-to guide](guide.md) — focused recipes (native shape, raw tree,
+- [How-to guide](guide.md). Focused recipes (native shape, raw tree,
   dialect detection, error handling).
-- [Reference](reference.md) — the API, the one option, the full
+- [Reference](reference.md). The API, the one option, the full
   Atom/native struct definitions, and the accepted grammar.
-- [Concepts](concepts.md) — why it defaults to Atom, what conversion
+- [Concepts](concepts.md). Why it defaults to Atom, what conversion
   loses, and the differences from the TypeScript version.

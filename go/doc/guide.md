@@ -77,8 +77,8 @@ case tabnasfeed.Rss1Feed:
 
 ## Access the raw XML tree
 
-When even the native shape is not enough — for example you need a
-non-standard namespace extension like `<media:content>` — drop down to
+When even the native shape is not enough (for example you need a
+non-standard namespace extension like `<media:content>`) drop down to
 the raw element tree from the XML plugin with `format: "raw"`:
 
 ```go
@@ -115,12 +115,12 @@ det := tabnasfeed.Detect(got)
 ## Convert a tree you already have
 
 If you obtained a raw element tree some other way, call `tabnasfeed.Convert`
-directly — it is what the plugin runs internally:
+directly; it is what the plugin runs internally:
 
 ```go
 out, err := tabnasfeed.Convert(rawTree, "atom") // or "native" / "raw"
 if err != nil {
-    // e.g. unrecognized root element
+    // for example unrecognized root element
 }
 f := out.(tabnasfeed.AtomFeed)
 ```
@@ -139,7 +139,7 @@ got, err := j.Parse(src)
 if err != nil {
     var je *tabnasjsonic.JsonicError
     if errors.As(err, &je) {
-        // je.Code, je.Error() — structured, with row/col and a snippet
+        // je.Code, je.Error(): structured, with row/col and a snippet
         log.Printf("feed parse failed: %v", je)
     }
     return err
@@ -154,5 +154,5 @@ A feed-level error's message contains
 
 The default conversion is lossy by design. The recommended path is to
 register the plugin with `format: "native"` and do any Atom-style
-mapping in your own code only where you need it — that way you never
+mapping in your own code only where you need it; that way you never
 lose a field you might want.

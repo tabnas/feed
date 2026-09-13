@@ -14,7 +14,7 @@ Import path: `github.com/tabnas/feed/go`, package name `feed`.
 | Symbol                                | Kind     | Description                                  |
 | ------------------------------------- | -------- | -------------------------------------------- |
 | `Feed(j *tabnasjsonic.Jsonic, opts map[string]any) error` | func | Plugin entry point; register with `UseDefaults`. |
-| `Defaults`                            | `map[string]any` | `{"format": "atom", "strictNamespaces": true}` — merged with caller options. |
+| `Defaults`                            | `map[string]any` | `{"format": "atom", "strictNamespaces": true}`, merged with caller options. |
 | `Detect(root any) Detection`          | func     | Report dialect/version of a raw XML root.    |
 | `Convert(root any, format string) (any, error)` | func | Turn a raw element tree into the requested shape. |
 | `VERSION`                             | `string` | Module version; always equal to `ts/package.json` "version". |
@@ -27,7 +27,7 @@ Public types: `Detection`, `AtomFeed`, `AtomEntry`, `AtomEntrySource`,
 
 ## Registration and the parse entry
 
-`Feed` has no factory of its own — register it on a `jsonic` instance
+`Feed` has no factory of its own: register it on a `jsonic` instance
 with `UseDefaults`. Parsing is the instance's `Parse` method.
 
 ```go
@@ -40,7 +40,7 @@ result, err := j.Parse(source)                        // (any, error)
 (so `Defaults` first, then caller `opts`), giving caller options
 precedence. Pass no extra map for defaults-only. `Feed` calls
 `j.UseDefaults(tabnasxml.Xml, tabnasxml.Defaults, ...)` internally, so the XML plugin is
-installed for you — you still need `github.com/tabnas/xml/go` as a
+installed for you; you still need `github.com/tabnas/xml/go` as a
 dependency. `Feed` is idempotent: it short-circuits if already applied
 to the instance.
 
@@ -57,11 +57,11 @@ Two options are supported.
 var Defaults = map[string]any{"format": "atom", "strictNamespaces": true}
 ```
 
-- `"atom"` (default) — every dialect is normalised to a single
+- `"atom"` (default). Every dialect is normalised to a single
   `tabnasfeed.AtomFeed`.
-- `"native"` — the dialect-specific struct, with no cross-dialect
+- `"native"`. The dialect-specific struct, with no cross-dialect
   normalisation: `tabnasfeed.AtomFeed`, `tabnasfeed.Rss2Feed`, or `tabnasfeed.Rss1Feed`.
-- `"raw"` — the underlying `map[string]any` element tree from the XML
+- `"raw"`. The underlying `map[string]any` element tree from the XML
   plugin, with no feed interpretation.
 
 An empty or absent `format` defaults to `"atom"`. Any other string is
@@ -70,7 +70,7 @@ treated as `"atom"` by the conversion (it returns the normalised shape).
 `strictNamespaces` is passed straight through to `github.com/tabnas/xml/go`,
 but with the opposite default. The XML plugin defaults it `false` because
 bare XML 1.0 well-formedness does not require namespace well-formedness;
-`feed` defaults it `true` because feeds are namespace-defined formats — Atom
+`feed` defaults it `true` because feeds are namespace-defined formats: Atom
 *is* its namespace, RSS 1.0 is RDF, and every RSS 2.0 extension (`dc:`,
 `content:`, `sy:`, `georss:`) is a prefixed name, so an element or attribute
 with an undeclared prefix is a typo or a truncated document rather than an
@@ -124,7 +124,7 @@ How the version is decided:
 | `rss`        | any other / missing `version`                 | `rss` / `rss20`   |
 | `RDF`        | channel namespace `http://my.netscape.com/rdf/simple/0.9/` | `rdf` / `rss090` |
 | `RDF`        | otherwise                                     | `rdf` / `rss10`   |
-| anything else| —                                             | `unknown` / `unknown` |
+| anything else| (none)                                             | `unknown` / `unknown` |
 
 `rss091n` is a possible `Version` value but is not produced by
 `Detect`; bare `version="0.91"` is reported as `rss091u`.
@@ -190,7 +190,7 @@ to a string). `AtomEntrySource` is a slim `AtomFeed` (no `Entries`)
 used for the Atom-source element an RSS `<item>/<source>` maps to.
 
 Pointer fields (`*AtomText`, `*AtomGenerator`, `*AtomContent`) are
-`nil` when the source omits them — always nil-check before
+`nil` when the source omits them, so always nil-check before
 dereferencing.
 
 ## Native types
@@ -313,7 +313,7 @@ child    = "TX" / element
 | `XSC` | XML self-closing tag `<name .../>`             |
 
 Ignored tokens: `CM` (comment), `SP` (whitespace), `LN` (newline),
-`XIG` (ignored markup — comment, processing instruction, or DOCTYPE).
+`XIG` (ignored markup: a comment, processing instruction, or DOCTYPE).
 
 The railroad / syntax diagram is in
 [`../../ts/doc/grammar.svg`](../../ts/doc/grammar.svg) (vertical ASCII

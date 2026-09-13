@@ -25,7 +25,7 @@ Exported types: `FeedFormat`, `FeedDialect`, `FeedVersion`,
 
 ## Registration and the parse entry
 
-`Feed` has no factory of its own — it is registered on a `Tabnas`
+`Feed` has no factory of its own: it is registered on a `Tabnas`
 engine instance with `.use()`. Parsing is the engine's `parse` method;
 there is no separate feed-parse function.
 
@@ -43,7 +43,7 @@ const result = j.parse(source)   // FeedResult
 
 `.use(jsonic)` must come first (it installs the lexer the XML grammar
 needs). `Feed` calls `tn.use(Xml)` internally, so you do **not** have
-to register `@tabnas/xml` yourself — though installing it as a
+to register `@tabnas/xml` yourself, though installing it as a
 dependency is required.
 
 ## Options
@@ -60,11 +60,11 @@ type FeedFormat = 'atom' | 'native' | 'raw'
 type FeedOptions = { format?: FeedFormat; strictNamespaces?: boolean }
 ```
 
-- `'atom'` (default) — every dialect is normalised to a single
+- `'atom'` (default). Every dialect is normalised to a single
   Atom-shaped `AtomFeed`.
-- `'native'` — the dialect-specific structure, with no cross-dialect
+- `'native'`. The dialect-specific structure, with no cross-dialect
   normalisation: `AtomFeed`, `Rss2Feed`, or `Rss1Feed`.
-- `'raw'` — the underlying `XmlElement` tree from `@tabnas/xml`, with
+- `'raw'`. The underlying `XmlElement` tree from `@tabnas/xml`, with
   no feed interpretation at all.
 
 An unknown `format` string is not validated; pass only the three
@@ -73,7 +73,7 @@ documented values.
 `strictNamespaces` is passed straight through to `@tabnas/xml`, but with
 the opposite default. `@tabnas/xml` defaults it `false` because bare XML 1.0
 well-formedness does not require namespace well-formedness; `@tabnas/feed`
-defaults it `true` because feeds are namespace-defined formats — Atom *is*
+defaults it `true` because feeds are namespace-defined formats: Atom *is*
 its namespace, RSS 1.0 is RDF, and every RSS 2.0 extension (`dc:`,
 `content:`, `sy:`, `georss:`) is a prefixed name, so an element or attribute
 with an undeclared prefix is a typo or a truncated document rather than an
@@ -127,7 +127,7 @@ How the version is decided:
 | `rss`        | any other / missing `@version`                | `rss` / `rss20`         |
 | `RDF`        | channel namespace `http://my.netscape.com/rdf/simple/0.9/` | `rdf` / `rss090` |
 | `RDF`        | otherwise                                     | `rdf` / `rss10`         |
-| anything else| —                                             | `unknown` / `unknown`   |
+| anything else| (none)                                             | `unknown` / `unknown`   |
 
 `rss091n` (the Netscape 0.91 variant) is a possible `FeedVersion`
 value but is not produced by `detect`: bare `version="0.91"` is
@@ -283,7 +283,7 @@ it accepts is exactly the XML grammar from
 [`@tabnas/xml`](https://github.com/tabnas/xml): a feed is an XML
 document whose single root element is `<feed>`, `<rss>`, or `<RDF>`.
 The feed plugin hooks the XML grammar's close phase and runs detection
-plus conversion on the resulting element tree — it never changes how
+plus conversion on the resulting element tree; it never changes how
 text is tokenised or how elements nest.
 
 The grammar rules (`xml`, `element`, `content`, `child`) and their
@@ -304,7 +304,7 @@ child    = "TX" / element
 | `XSC` | XML self-closing tag `<name .../>`              |
 
 Ignored tokens: `CM` (comment), `SP` (whitespace), `LN` (newline),
-`XIG` (ignored markup — comment, processing instruction, or DOCTYPE).
+`XIG` (ignored markup: a comment, processing instruction, or DOCTYPE).
 
 The railroad / syntax diagram is in
 [`grammar.svg`](grammar.svg) (vertical ASCII in
