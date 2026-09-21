@@ -9,9 +9,14 @@
 // discrepancy.
 //
 // What is left here is only what is specific to feed: the two fixture
-// modes (in `common::spec_runner`), what an `ERROR:` cell means, and the
-// two rows this port cannot satisfy, which are recorded in
-// `test/divergent.tsv` and executed by `tests/divergent_test.rs` instead.
+// modes (in `common::spec_runner`) and what an `ERROR:` cell means.
+//
+// EVERY row runs. There is no exemption list, because there is no row
+// this port cannot satisfy: the two that could not, both of them pinning
+// the rendered message of a namespace rejection raised by `tabnas-xml`,
+// pass since that crate's Rust raise path was repaired. A row this port
+// cannot satisfy belongs in `test/divergent.tsv`, executed by
+// `tests/divergent_test.rs`, never in a skip here.
 
 mod common;
 
@@ -20,35 +25,6 @@ use std::fs;
 use tabnas_support::{load_spec_dir, SpecOptions};
 
 use common::{spec_dir, spec_runner};
-
-/// Rows this port does NOT satisfy, by fixture and by input.
-///
-/// Each one is recorded in `test/divergent.tsv` with a `rust` column and
-/// argued in `DIVERGENCE.md`; the register fails when the divergence is
-/// repaired as loudly as when it regresses, so an entry here cannot
-/// outlive the reason for it. The list is asserted to be EXACTLY what the
-/// run met, so a stale entry fails too.
-///
-/// Both are the same defect in `tabnas-xml`'s Rust crate: the namespace
-/// failure path never interpolates its message template, so the rendered
-/// message is a placeholder while the code is correct. These fixtures pin
-/// the MESSAGE, so they cannot pass until that is repaired upstream.
-/// Keyed by the `opts` cell as well as the input, because the same input
-/// appears twice in `xml-layer.tsv`: once with `strictNamespaces: false`,
-/// where it parses and the row passes, and once with the defaults, where
-/// it is refused and the message is what diverges.
-const RECORDED_DIVERGENCES: [(&str, &str, &str); 2] = [
-    (
-        "xml-layer.tsv",
-        "<feed xmlns=\"http://www.w3.org/2005/Atom\"><dc:language>en</dc:language></feed>",
-        "",
-    ),
-    (
-        "xml-layer.tsv",
-        "<feed xmlns=\"http://www.w3.org/2005/Atom\" xmlns:a=\"http://x\ny\"/>",
-        "",
-    ),
-];
 
 #[test]
 fn every_shared_fixture() {
@@ -60,7 +36,6 @@ fn every_shared_fixture() {
     );
 
     let mut failures: Vec<String> = Vec::new();
-    let mut met: Vec<(String, String, String)> = Vec::new();
     let mut rows = 0usize;
 
     for spec in &specs {
@@ -88,14 +63,6 @@ fn every_shared_fixture() {
         for row in &spec.rows {
             rows += 1;
             let input = row.unesc(input_col);
-            let opts = row.named("opts").to_string();
-            if RECORDED_DIVERGENCES
-                .iter()
-                .any(|(file, text, cell)| *file == spec.file && *text == input && *cell == opts)
-            {
-                met.push((spec.file.clone(), input, opts));
-                continue;
-            }
             if let Err(error) = runner.check_row(row, &input, row.col(expected_col)) {
                 failures.push(error.0);
             }
@@ -109,22 +76,6 @@ fn every_shared_fixture() {
         failures.join("\n")
     );
     assert!(0 < rows, "the fixtures hold no rows");
-
-    // A recorded divergence whose row is gone is a stale exemption, and
-    // an exemption list that is longer than what the run met would hide a
-    // row that silently stopped running.
-    let mut seen: Vec<(&str, &str, &str)> = met
-        .iter()
-        .map(|(file, input, opts)| (file.as_str(), input.as_str(), opts.as_str()))
-        .collect();
-    seen.sort_unstable();
-    let mut declared: Vec<(&str, &str, &str)> = RECORDED_DIVERGENCES.to_vec();
-    declared.sort_unstable();
-    assert_eq!(
-        seen, declared,
-        "the recorded divergences and the rows met do not match; \
-         delete a stale entry or add the row back"
-    );
 }
 
 /// The runner reads the row by column NAME, so every fixture must carry

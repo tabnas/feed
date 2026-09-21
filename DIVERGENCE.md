@@ -14,63 +14,27 @@ fails BOTH ways: when a port regresses, and when a port is repaired and
 the row stops being true. Prose alone is not a record, and no claim here
 is wider than what that file measures.
 
-## The namespace diagnostics lose their message in the Rust port
+## None are recorded today
 
-| input | TypeScript | Go | Rust |
-|---|---|---|---|
-| `<feed xmlns="http://www.w3.org/2005/Atom"><dc:language>en</dc:language></feed>` | rejected, `element or attribute uses an undeclared namespace prefix` | same | rejected, `namespace resolution failed` |
-| `<feed xmlns="http://www.w3.org/2005/Atom" xmlns:a="http://x\ny"/>` | rejected, `namespace name cannot contain white space` | same | rejected, `namespace resolution failed` |
+The three ports agree on every input this repository measures, so
+[`test/divergent.tsv`](test/divergent.tsv) holds no rows and
+[`rs/tests/parity_test.rs`](rs/tests/parity_test.rs) runs every shared
+fixture row with no exemption. The register file stays, header and all,
+because the suite still reads it and a new divergence is one row away.
 
-All three ports REJECT both documents, and all three report the same
-error code (`unbound_prefix`, `invalid_namespace_uri`). What differs is
-the rendered message, which is what
-[`test/spec/xml-layer.tsv`](test/spec/xml-layer.tsv) pins: this
-repository's fixtures spell an expectation as `ERROR:<message fragment>`
-rather than as a code, because the feed layer has no codes of its own
-(see [`test/AGENTS.md`](test/AGENTS.md)).
-
-Provenance of the table. The Rust column was measured on 2026-09-21
-against the sibling checkouts. The TypeScript and Go columns are the
-values those two fixture rows pin, which both suites assert; the same
-message text is also what the Rust `tabnas-xml` crate's own template
-table carries for those two codes, so the three ports agree on what the
-message should say and only the Rust raise path fails to produce it.
-
-The defect is not in this crate and reproduces without it:
-
-```rust
-let options = tabnas_xml::XmlOptions {
-    strict_namespaces: true,
-    ..Default::default()
-};
-let error = tabnas_xml::make_with(&options)
-    .parse("<a><dc:b/></a>")
-    .unwrap_err();
-// error.code   == "unbound_prefix"        (right)
-// error.detail == "namespace resolution failed"  (the placeholder)
-```
-
-`register_refs` in `xml/rs/src/lib.rs` raises a namespace failure from
-the `@xml-bc` hook. It marks the CURRENT TOKEN bad, which is what makes
-the engine interpolate the message template for the code. At document
-close the context has no current token, so the fallback
-`ActionError::new(code, "namespace resolution failed")` runs instead and
-that literal string becomes the detail. The template is never consulted.
-
-Both register rows carry the same `why`, which is the one-line form of
-all of that: `tabnas/xml (rs): the namespace failure path never
-interpolates its message template`.
-
-**Owner of the repair: `tabnas/xml`, the Rust crate.** Nothing in
-`tabnas-feed` can reach that raise path, and working around it here would
-mean matching a message the reader does not see, which is a wider claim
-than the test measures.
-
-When it lands, both rows go red in
-[`test/divergent.tsv`](test/divergent.tsv), and the two entries come out
-of `RECORDED_DIVERGENCES` in
-[`rs/tests/parity_test.rs`](rs/tests/parity_test.rs) so the shared
-fixture rows run normally again.
+The entry that stood here until 2026-09-21 recorded that the Rust
+`tabnas-xml` crate rendered the literal text `namespace resolution
+failed` in place of the message each namespace code names, which made two
+rows of [`test/spec/xml-layer.tsv`](test/spec/xml-layer.tsv) unsatisfiable
+in this port: they pin a message fragment, and the fragment was never
+produced. The repair landed in `tabnas/xml` (`rs/src/lib.rs`, the
+`@xml-bc` hook now marks the engine's no-token sentinel instead of
+returning a bare `ActionError`), the register went red saying the
+divergence was closed, and both rows went back to being ordinary fixture
+rows. Measured through `tabnas_xml` and through this crate on 2026-09-21:
+`unbound_prefix` renders `element or attribute uses an undeclared
+namespace prefix` and `invalid_namespace_uri` renders `namespace name
+cannot contain white space`, at row 1 column 1, in all three runtimes.
 
 ## What is NOT a divergence
 

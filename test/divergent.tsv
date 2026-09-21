@@ -24,30 +24,19 @@ input	ts	go	rust	why
 #
 # Only the Rust suite reads it today (rs/tests/divergent_test.rs). The
 # TypeScript and Go halves would read the `ts` and `go` columns of this
-# same file; both rows below are about the Rust port alone, so neither
-# half would have anything to report yet.
+# same file.
 #
-# MEASURED 2026-09-21 against the sibling checkouts, by running each port.
+# Every row is MEASURED against the sibling checkouts, by running each
+# port, on the date the row is added.
 #
-# --- The namespace diagnostics lose their message in Rust ----------------
-# Both rows are the same defect, in tabnas/xml's RUST crate, and they
-# reproduce with `tabnas_xml` alone — no feed involved:
+# The register is EMPTY today: the three ports agree on every input this
+# repository measures. That is the state to keep it in. An empty register
+# is not an unused file — rs/tests/divergent_test.rs still loads it,
+# checks this header, and runs any row added below — so a new divergence
+# is one row and a DIVERGENCE.md entry away.
 #
-#   let options = XmlOptions { strict_namespaces: true, ..Default::default() };
-#   make_with(&options).parse(r#"<a><dc:b/></a>"#).unwrap_err().detail
-#   // "namespace resolution failed", not the template for the code
-#
-# xml/rs/src/lib.rs `register_refs` raises the namespace failure from
-# `@xml-bc`. It marks the current token bad, which interpolates the
-# message template for the code, EXCEPT when the context has no current
-# token — at document close it has none, so the fallback
-# `ActionError::new(code, "namespace resolution failed")` runs and the
-# detail is that literal string. The CODE is right in every runtime
-# (`unbound_prefix`, `invalid_namespace_uri`) and the template text is
-# right in the crate; only this raise path never reaches it.
-#
-# Repair belongs in tabnas/xml (rs), not here. The two rows come off this
-# file and go back to passing in test/spec/xml-layer.tsv the day it lands,
-# which is what the exemption list in rs/tests/parity_test.rs is for.
-<feed xmlns="http://www.w3.org/2005/Atom"><dc:language>en</dc:language></feed>	ERROR:element or attribute uses an undeclared namespace prefix	ERROR:element or attribute uses an undeclared namespace prefix	ERROR:namespace resolution failed	tabnas/xml (rs): the namespace failure path never interpolates its message template
-<feed xmlns="http://www.w3.org/2005/Atom" xmlns:a="http://x\ny"/>	ERROR:namespace name cannot contain white space	ERROR:namespace name cannot contain white space	ERROR:namespace resolution failed	tabnas/xml (rs): the namespace failure path never interpolates its message template
+# The last entries to leave were two rows recording that tabnas/xml's
+# Rust crate rendered "namespace resolution failed" in place of the
+# message each namespace code names. That was repaired upstream, the
+# register went red saying so, and the rows went back to being ordinary
+# fixture rows in test/spec/xml-layer.tsv, lines 18 and 25.

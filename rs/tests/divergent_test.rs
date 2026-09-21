@@ -15,10 +15,15 @@
 // The rows are run through the SAME runner the parity suite uses
 // (`common::spec_runner`), so a cell here means what a cell there means,
 // the `ERROR:<message fragment>` convention included.
+//
+// The register holds no rows today: the three ports agree on every input
+// this repository measures. The tests below still run, and still fail if
+// the file stops being read or a row is added without the argument in
+// `DIVERGENCE.md` that a row has to carry.
 
 mod common;
 
-use tabnas_support::{load_spec, Register, SpecOptions};
+use tabnas_support::{load_spec, no_divergences, Register, SpecOptions};
 
 use common::{repo_root, spec_runner};
 
@@ -28,10 +33,26 @@ fn the_register_still_records_what_it_says() {
     let spec = load_spec(&path, &SpecOptions::default())
         .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
 
-    // An EMPTY register is legitimate, a repo with no divergences, but an
-    // empty FILE is not: it cannot be told apart from a loader that read
-    // nothing.
-    assert!(!spec.rows.is_empty(), "{} has no rows", path.display());
+    // An EMPTY register is legitimate: it is a repo whose ports agree,
+    // which is what this one is today. An empty FILE is not, because it
+    // cannot be told apart from a loader that read nothing, so the HEADER
+    // is what is asserted rather than the row count. A register that
+    // silently stopped being read would lose its header first.
+    assert_eq!(
+        spec.header.as_slice(),
+        ["input", "ts", "go", "rust", "why"],
+        "{}: the register header is not the one the runner reads",
+        path.display()
+    );
+
+    // The register runs when it holds rows, and says so out loud when it
+    // does not. `Register::spec` refuses a file with no cases, which is
+    // the right refusal for a fixture and the wrong one for a register a
+    // repair has emptied, so the empty case is named rather than run.
+    if spec.rows.is_empty() {
+        no_divergences("tabnas-feed: the three ports agree on every measured input");
+        return;
+    }
 
     Register::new(spec_runner("expected"), "rust", &["ts", "go", "rust"]).spec(&spec);
 }

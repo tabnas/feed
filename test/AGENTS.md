@@ -69,11 +69,15 @@ purpose: every parity runner enumerates `test/spec` and reads the SECOND
 column header to decide what a file asserts, so a register dropped in
 here would be refused by all three of them.
 
-Two rows of [`spec/xml-layer.tsv`](spec/xml-layer.tsv) are recorded
-there today, both about the Rust port, both owned by `@tabnas/xml`. The
-Rust parity runner steps over exactly those two, from a list asserted to
-match what the run met, and `rs/tests/divergent_test.rs` executes the
-register instead. See [`../DIVERGENCE.md`](../DIVERGENCE.md).
+No row is recorded there today: the three ports agree on every input
+this repository measures, so every row of every file in `spec/` runs and
+passes in all three runtimes, and the Rust parity runner steps over
+nothing. The register keeps its header and is still executed by
+`rs/tests/divergent_test.rs`, which names the empty state rather than
+skipping. The two rows of [`spec/xml-layer.tsv`](spec/xml-layer.tsv) that
+were recorded there until 2026-09-21 came back the day `@tabnas/xml`
+repaired the Rust message they pin. See
+[`../DIVERGENCE.md`](../DIVERGENCE.md).
 
 `test/feedparser-wellformed/` is a separate, larger third-party corpus used
 for smoke coverage (`TestCorpus*` / `feedparser.test.ts`), not for pinning

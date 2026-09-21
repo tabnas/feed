@@ -268,10 +268,10 @@ language rather than chosen:
 - **A rejection carries a code**, because the engine's error channel has
   no way to raise one without.
 
-Measured differences in behaviour, of which there are two today, are
+Measured differences in behaviour, of which there are none today, are
 recorded in [`../DIVERGENCE.md`](../DIVERGENCE.md) and executed as rows
-in [`../test/divergent.tsv`](../test/divergent.tsv). Both belong to
-`tabnas-xml` rather than to this crate.
+in [`../test/divergent.tsv`](../test/divergent.tsv). Every row of every
+shared fixture passes in this port, with no exemption.
 
 ## Build and test
 
