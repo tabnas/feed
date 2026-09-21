@@ -128,19 +128,26 @@ makes three distinctions load-bearing, and each has its own helper:
 Getting one of these wrong shows up as a spurious key or a missing one
 in a shared fixture, which is exactly what those fixtures are for.
 
-## Recorded divergences and the exemption list
+## Recorded divergences, and why there is no exemption list
 
-Two rows of `../test/spec/xml-layer.tsv` cannot pass in this port. They
-pin the rendered MESSAGE of a namespace rejection, and the Rust
-`tabnas-xml` crate raises that rejection down a path that never
-interpolates its message template. `../DIVERGENCE.md` argues it,
-`../test/divergent.tsv` executes it, and `RECORDED_DIVERGENCES` in
-`tests/parity_test.rs` is the list of rows the parity suite steps over.
+There is none. Every row of every shared fixture runs in this port and
+passes, `../test/divergent.tsv` holds no rows, and `tests/parity_test.rs`
+skips nothing.
 
-That list is asserted to be EXACTLY the set of rows the run met, so a
-stale entry fails as loudly as a missing one, and the register fails the
-day the repair lands. Do not add an entry to make a red row green: a row
-that fails for any other reason is a defect in this port.
+Two rows of `../test/spec/xml-layer.tsv` used to be exempt: they pin the
+rendered MESSAGE of a namespace rejection, and the Rust `tabnas-xml`
+crate raised that rejection down a path that never reached the message
+template, so the rendered text was the stand-in `namespace resolution
+failed`. That was repaired in `tabnas/xml` (rs). The register then went
+RED, which is the mechanism working: a divergence that has been repaired
+fails as loudly as one that has regressed, and the row cannot outlive it.
+Both halves came out together, the two register rows and the exemption
+list in `tests/parity_test.rs`.
+
+A row this port cannot satisfy goes in `../test/divergent.tsv` with a
+column per runtime and an argument in `../DIVERGENCE.md`; nothing is
+skipped in the parity suite to make a red row green. A row that fails for
+any other reason is a defect in this port.
 
 ## Depth is not this crate's to bound, and it has one anyway
 
