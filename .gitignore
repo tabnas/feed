@@ -49,3 +49,8 @@ test/feedvalidator/
 
 # Written by the counts script while measuring, removed after.
 .vale-counts.ini
+
+# --- Rust ---
+# The build directory only. rs/Cargo.lock IS committed: ci/rust/run.sh
+# compares it against rs/Cargo.toml before and after cargo runs.
+target/

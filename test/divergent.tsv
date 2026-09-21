@@ -1,0 +1,53 @@
+input	ts	go	rust	why
+# divergent.tsv — where this repo's ports DISAGREE, executed by the port
+# that diverges.
+#
+#   input  Feed XML source. Escapes \n \r \t \\ are decoded, as in
+#          test/spec.
+#   ts,go,rust
+#          what each port produces: a JSON value, or ERROR:<fragment>.
+#          As everywhere in this repo the text after ERROR: is a fragment
+#          of the MESSAGE, not an error code — see test/AGENTS.md.
+#   why    what is wrong, and where the repair lives.
+#
+# NOT A FIXTURE. A fixture fails when behaviour REGRESSES. This fails BOTH
+# ways: when a port is repaired to agree with the others, the row still
+# claims they differ, so the suite goes red and names the row to delete. A
+# divergence recorded as a passing test of current behaviour survives its
+# own repair, and the record then describes something that no longer
+# happens with nothing red.
+#
+# This file sits in test/ rather than test/spec/ on purpose. Both parity
+# runners enumerate every .tsv under test/spec and read the SECOND column
+# header to decide what the file asserts, so a register dropped in there
+# would be refused by all three of them.
+#
+# Only the Rust suite reads it today (rs/tests/divergent_test.rs). The
+# TypeScript and Go halves would read the `ts` and `go` columns of this
+# same file; both rows below are about the Rust port alone, so neither
+# half would have anything to report yet.
+#
+# MEASURED 2026-09-21 against the sibling checkouts, by running each port.
+#
+# --- The namespace diagnostics lose their message in Rust ----------------
+# Both rows are the same defect, in tabnas/xml's RUST crate, and they
+# reproduce with `tabnas_xml` alone — no feed involved:
+#
+#   let options = XmlOptions { strict_namespaces: true, ..Default::default() };
+#   make_with(&options).parse(r#"<a><dc:b/></a>"#).unwrap_err().detail
+#   // "namespace resolution failed", not the template for the code
+#
+# xml/rs/src/lib.rs `register_refs` raises the namespace failure from
+# `@xml-bc`. It marks the current token bad, which interpolates the
+# message template for the code, EXCEPT when the context has no current
+# token — at document close it has none, so the fallback
+# `ActionError::new(code, "namespace resolution failed")` runs and the
+# detail is that literal string. The CODE is right in every runtime
+# (`unbound_prefix`, `invalid_namespace_uri`) and the template text is
+# right in the crate; only this raise path never reaches it.
+#
+# Repair belongs in tabnas/xml (rs), not here. The two rows come off this
+# file and go back to passing in test/spec/xml-layer.tsv the day it lands,
+# which is what the exemption list in rs/tests/parity_test.rs is for.
+<feed xmlns="http://www.w3.org/2005/Atom"><dc:language>en</dc:language></feed>	ERROR:element or attribute uses an undeclared namespace prefix	ERROR:element or attribute uses an undeclared namespace prefix	ERROR:namespace resolution failed	tabnas/xml (rs): the namespace failure path never interpolates its message template
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:a="http://x\ny"/>	ERROR:namespace name cannot contain white space	ERROR:namespace name cannot contain white space	ERROR:namespace resolution failed	tabnas/xml (rs): the namespace failure path never interpolates its message template

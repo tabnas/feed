@@ -29,7 +29,9 @@ exported for callers working with `raw` output.
 |---|---|
 | [`ts/`](ts/) | **Canonical** TypeScript implementation — the `@tabnas/feed` package. Everything lives in `src/feed.ts` (plugin + types + helpers). No CLI. |
 | [`go/`](go/) | Go port — module `github.com/tabnas/feed/go`. Plugin + helpers in `go/feed.go`; top-level `const VERSION` mirrors `ts/package.json`. |
-| [`test/spec/`](test/spec/) | Shared `.tsv` conformance fixtures. Both runtimes auto-discover this dir; the header row's second column name selects what is compared (`expected` = the parse result, `detect` = the dialect report). See [`test/AGENTS.md`](test/AGENTS.md). |
+| [`rs/`](rs/) | Rust port — crate `tabnas-feed`. Plugin + helpers in `rs/src/lib.rs`; `pub const VERSION` mirrors `ts/package.json`. See [`rs/AGENTS.md`](rs/AGENTS.md). |
+| [`test/divergent.tsv`](test/divergent.tsv) | The divergence register: where a port disagrees, with a column per runtime, executed rather than described. Argued in [`DIVERGENCE.md`](DIVERGENCE.md). |
+| [`test/spec/`](test/spec/) | Shared `.tsv` conformance fixtures. All three runtimes auto-discover this dir; the header row's second column name selects what is compared (`expected` = the parse result, `detect` = the dialect report). See [`test/AGENTS.md`](test/AGENTS.md). |
 | [`test/feedparser-wellformed/`](test/feedparser-wellformed/) | Vendored well-formed feed corpus from kurtmckee/feedparser (BSD 2-Clause), in `atom10/` `atom/` `rss/` `rdf/` subdirs. Both runtimes parse these and assert detection. See `THIRD_PARTY_NOTICES.md`. |
 | `test/feedvalidator/`, `test/feedparser/` | The full third-party conformance corpora, **fetched at a pinned commit and gitignored — never committed**. `make fetch` (or `scripts/fetch-feedvalidator.sh` / `scripts/fetch-feedparser.sh`) populates them. |
 | [`scripts/fetch-corpus.mjs`](scripts/fetch-corpus.mjs) | The fetcher, holding the pinned upstream SHAs. The two `.sh` wrappers are thin `exec`s over it so `npm pretest` works on Windows CI too. |
@@ -57,6 +59,14 @@ checkouts (none of the `@tabnas/*` packages are published yet):
   `../../jsonic/go` and `../../xml/go`. It does **not** require
   `parser/go` directly — that comes transitively through jsonic and xml.
 
+- Rust `rs/Cargo.toml` takes every dependency by PATH, because none of the
+  crates is published: `tabnas` (`../../parser/rs`), `tabnas-jsonic`
+  (`../../jsonic/rs`, which brings `tabnas-json` from `../../json/rs`) and
+  `tabnas-xml` (`../../xml/rs`), plus `tabnas-support`
+  (`../../support/rs`) and `tabnas-debug` (`../../debug/rs`) as
+  dev-dependencies. `ci/rust/run.sh` checks for each checkout before it
+  runs anything.
+
 Clone the transitive closure as siblings of this repo and build their TS
 first (`cd <dep>/ts && npm install && npm run build`), then work here. CI
 clones and builds them all in order (see below).
@@ -66,12 +76,18 @@ Feed: the feed plugin pulls in Xml, and Xml/feed expect jsonic's lexer.
 
 - TS: `new Tabnas().use(jsonic).use(Feed)` (or `.use(Feed, { format })`).
 - Go: `j := jsonic.Make(); j.UseDefaults(feed.Feed, feed.Defaults, opts)`.
+- Rust: `tabnas_feed::make()`, `make_with(&options)`, or
+  `parser.use_plugin(tabnas_feed::plugin(), Some(options.to_value()))` on
+  a `tabnas_jsonic::make()` instance.
 
 ## Authority and alignment rules
 
-1. **TypeScript is canonical.** When TS and Go disagree on parse or
-   normalization behavior, TS wins; change Go to match, and add or extend
-   a shared fixture when the behavior is expressible as input → output.
+1. **TypeScript is canonical.** When a port disagrees with TS on parse or
+   normalization behavior, TS wins; change the port to match, and add or
+   extend a shared fixture when the behavior is expressible as input →
+   output. When a port CANNOT be changed, because the repair belongs in a
+   dependency, the disagreement goes in `test/divergent.tsv` and
+   `DIVERGENCE.md` rather than being softened in the fixture.
 2. The shared fixtures in `test/spec/*.tsv` are the **parity contract**.
    Both suites enumerate the directory, parse each `.xml` with the
    matching `format` option, and deep-equal the result against the
@@ -149,6 +165,21 @@ Go (module in `go/`):
 cd go && go build ./...
 cd go && go test -count=1 -v ./...      # spec + feedparser-wellformed + feedvalidator
 ```
+
+Rust (crate in `rs/`):
+
+```bash
+cd rs && cargo build --all-targets
+cd rs && cargo test --all-targets && cargo test --doc
+cd rs && cargo clippy --all-targets --all-features -- -D warnings
+cd rs && cargo fmt --check
+```
+
+`--all-targets` does NOT include doctests, so `cargo test --doc` is a
+separate line: the crate README is included under `#[cfg(doctest)]` and a
+stale example would otherwise pass a gate that never ran it.
+`bash ci/rust/run.sh` from the repo root is the whole gate, and it
+restores `rs/Cargo.lock` on exit so a run leaves the tree as it found it.
 
 **Always pass `-count=1` to the Go suite.** `test/spec/*.tsv`,
 `test/feedparser-wellformed/` and the fetched corpora all sit ABOVE the Go
@@ -235,10 +266,11 @@ What "correct" means here, in order of authority:
    means re-measuring and updating them in the same commit, not later. A
    correct run reports `skipped 0` and zero Go `SKIP` lines — no suite here
    is allowed to silently not-run.
-3. **The three version constants agree** — `ts/package.json` `"version"`,
-   `VERSION` in `ts/src/feed.ts`, and `const VERSION` in `go/feed.go`.
-   `ts/test/version.test.ts` and `go/version_test.go` fail the build if they
-   drift.
+3. **The four version sites agree** — `ts/package.json` `"version"`,
+   `VERSION` in `ts/src/feed.ts`, `const VERSION` in `go/feed.go`, and
+   `version` plus `pub const VERSION` in `rs/`.
+   `ts/test/version.test.ts`, `go/version_test.go` and
+   `rs/tests/version_test.rs` fail the build if any drifts.
 
 ## Releasing
 
@@ -470,11 +502,17 @@ They stay in the Makefile because removing them is a separate change.
 
 ## Error codes
 
-This package declares **no error codes of its own** — neither runtime extends
-`options.error`/`options.hint` (`ts/src/feed.ts`, `go/feed.go`). The feed
-layer's own rejections are thrown as prose (`feed: unrecognized root element
-…`), and everything else surfaces through `@tabnas/xml`'s codes or the
-engine's base codes. No fixture here pins an `ERROR:<code>` cell.
+This package declares **no error codes of its own** — no runtime extends
+`options.error`/`options.hint` (`ts/src/feed.ts`, `go/feed.go`,
+`rs/src/lib.rs`). The feed layer's own rejections are thrown as prose
+(`feed: unrecognized root element …`), and everything else surfaces through
+`@tabnas/xml`'s codes or the engine's base codes. No fixture here pins an
+`ERROR:<code>` cell.
+
+The Rust port is the one place a code appears, because the engine's Rust
+error channel has no way to raise one without: it uses
+`feed_unrecognized_root` for that single rejection. The MESSAGE is
+identical in all three, and the message is what every fixture pins.
 
 What the fixtures pin instead is rendered **messages**:
 [`test/spec/errors.tsv`](test/spec/errors.tsv),
@@ -509,9 +547,16 @@ value as hostile text.
 
 ## Tests
 
-- `ts/test/parity.test.ts` / `go/parity_test.go` drive the shared
-  `test/spec/*.tsv` fixtures across the three formats (`atom`, `native`, plus
-  `detect`).
+- `ts/test/parity.test.ts` / `go/parity_test.go` / `rs/tests/parity_test.rs`
+  drive the shared `test/spec/*.tsv` fixtures across the three formats
+  (`atom`, `native`, plus `detect`).
+- `rs/tests/divergent_test.rs` runs `test/divergent.tsv`, the register of
+  rows where a port disagrees. It fails when a port regresses AND when one
+  is repaired, so a recorded divergence cannot outlive its repair.
+- The Rust port has runners for the shared fixtures and the VENDORED
+  `test/feedparser-wellformed/` corpus, and none yet for the two FETCHED
+  corpora, so the conformance numbers below are a TypeScript and Go claim.
+  See [`rs/AGENTS.md`](rs/AGENTS.md).
 - `ts/test/feedparser.test.ts` / the Go equivalent run the vendored
   `test/feedparser-wellformed/` corpus and assert dialect/version
   detection per subdir.
@@ -681,6 +726,11 @@ with:
 cannot write `.github/workflows/*` — changes there are promoted by a
 maintainer via `tabnas/admin` `rollout/apply-ci-folders.sh` (admin
 `DECISIONS.md` ADR-8), so edit the org workflow, not this repo.
+
+The Rust gate is STAGED at [`ci/workflows/rust.yml`](ci/workflows/rust.yml)
+under that same ADR and is not promoted by an agent. It runs
+`ci/rust/run.sh`, which is also what a contributor runs locally, so the
+two cannot say different things.
 
 ## Agent tooling
 

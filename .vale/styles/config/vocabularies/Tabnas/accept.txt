@@ -24,6 +24,7 @@
 [Ss]uperset
 [Tt]abnas
 [Tt]okenised
+[Uu]ntrusted
 [Uu]serland
 [Vv]endored
 [Vv]oxgig

@@ -1,0 +1,36 @@
+[package]
+name = "tabnas-feed"
+version = "0.6.7"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+description = "RSS and Atom feed plugin for the tabnas parsing engine, normalising every dialect to an Atom shape"
+repository = "https://github.com/tabnas/feed"
+
+[lib]
+name = "tabnas_feed"
+path = "src/lib.rs"
+
+[dependencies]
+# The engine, the relaxed-JSON base grammar and the XML grammar this
+# plugin is layered on are consumed as SIBLING CHECKOUTS, the standard
+# tabnas development model: clone https://github.com/tabnas/parser,
+# https://github.com/tabnas/jsonic and https://github.com/tabnas/xml next
+# to this repo. jsonic in turn takes tabnas-json from ../../json/rs, so
+# that checkout is needed too even though this crate does not name it.
+# None of them is published, so there is no registry version to fall back
+# on.
+tabnas = { path = "../../parser/rs" }
+tabnas-jsonic = { path = "../../jsonic/rs" }
+tabnas-xml = { path = "../../xml/rs" }
+indexmap = "2"
+regex = "1.10"
+serde_json = { version = "1.0", features = ["preserve_order"] }
+
+[dev-dependencies]
+# The shared fixture loader and runner: one loader in three languages, so
+# the rows mean the same thing in every runtime.
+tabnas-support = { path = "../../support/rs", features = ["serde_json"] }
+# The composition test mirrors ts/test/debug-model.test.ts, which asserts
+# that this plugin contributes no rules of its own.
+tabnas-debug = { path = "../../debug/rs" }

@@ -12,7 +12,7 @@ feeds into a typed structure. By default every dialect is normalised to
 a single **Atom-shaped** result, so the same downstream code can consume
 feeds from any source. It is a plugin for the
 [`tabnas`](https://github.com/tabnas/parser) parsing engine, built on top
-of [`@tabnas/xml`](https://github.com/tabnas/xml), and ships in two
+of [`@tabnas/xml`](https://github.com/tabnas/xml), and ships in three
 languages with identical output.
 
 Docs, guides, the error reference and the playground: **[tabnas.dev](https://tabnas.dev)**.
@@ -26,6 +26,11 @@ npm install @tabnas/feed @tabnas/parser @tabnas/jsonic @tabnas/xml
 # Go
 go get github.com/tabnas/feed/go
 ```
+
+The Rust crate is not published. It is consumed as a path dependency on
+a sibling checkout, together with the engine, the jsonic base grammar
+and the XML grammar; [`rs/README.md`](rs/README.md) has the four
+entries.
 
 ## One tiny example
 
@@ -53,6 +58,14 @@ f := got.(tabnasfeed.AtomFeed)
 fmt.Println(f.Title.Value) // My Blog
 ```
 
+**Rust.** The same again, as an engine value:
+
+```rust
+let feed = tabnas_feed::parse(
+    "<rss version=\"2.0\"><channel><title>My Blog</title></channel></rss>")?;
+feed.to_json()["title"]["value"]; // "My Blog"
+```
+
 The input was RSS 2.0 but the result is in Atom shape: `title` is an
 `AtomText` (`{ type, value }`), and the whole object follows RFC 4287.
 Pass `{ format: 'native' }` to keep the source dialect's structure, or
@@ -78,6 +91,11 @@ Separately, 1734/1734 (100%) of the RSS/Atom-rooted well-formed documents in
 **kurtmckee/feedparser** parse to an Atom shape: measured, but not yet
 asserted by a committed harness.
 
+Those three numbers are TypeScript and Go. The Rust port runs the shared
+fixtures and the vendored `feedparser-wellformed` corpus, and has no
+runner for the two fetched corpora yet, so it makes no conformance claim
+of its own; [`rs/AGENTS.md`](rs/AGENTS.md) says so in the same words.
+
 See [`AGENTS.md`](AGENTS.md#conformance-what-is-actually-verified) for how
 the corpora are fetched, which documents fall outside the RSS/Atom claim, and
 the one remaining `@tabnas/xml` gap.
@@ -94,8 +112,10 @@ one file each, per language:
 | Reference  | [ts/doc/reference.md](ts/doc/reference.md) | [go/doc/reference.md](go/doc/reference.md) |
 | Concepts   | [ts/doc/concepts.md](ts/doc/concepts.md) | [go/doc/concepts.md](go/doc/concepts.md) |
 
-Language hubs: [`ts/README.md`](ts/README.md) and
-[`go/README.md`](go/README.md).
+Language hubs: [`ts/README.md`](ts/README.md),
+[`go/README.md`](go/README.md) and [`rs/README.md`](rs/README.md). The
+Rust crate documents itself in that one page rather than in a quadrant
+set of its own.
 
 ## Repository layout
 
@@ -103,7 +123,9 @@ Language hubs: [`ts/README.md`](ts/README.md) and
 | -------------------------------------------------------------- | -------------------------------------------- |
 | [`ts/`](ts/)                                                   | Canonical TypeScript / JavaScript implementation. |
 | [`go/`](go/)                                                   | Go port (`github.com/tabnas/feed/go`).       |
-| [`test/spec/`](test/spec/)                                    | Shared `.tsv` conformance fixtures, run by both runtimes. |
+| [`rs/`](rs/)                                                   | Rust port (crate `tabnas-feed`).             |
+| [`test/spec/`](test/spec/)                                    | Shared `.tsv` conformance fixtures, run by all three runtimes. |
+| [`test/divergent.tsv`](test/divergent.tsv)                    | The divergence register: where a port disagrees, executed. |
 | [`test/feedparser-wellformed/`](test/feedparser-wellformed/)  | Vendored well-formed corpus (BSD 2-Clause).  |
 
 ## Grammar diagram

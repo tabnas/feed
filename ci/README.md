@@ -21,3 +21,14 @@ This directory exists because session credentials cannot write
   suite already runs the other half of the gate
   (`ts/test/docs.test.js`), so promoting this adds the spelling and
   Google-convention arm rather than the whole gate.
+
+- **`workflows/rust.yml`** — the Rust port gate: format, build, tests,
+  doctests and clippy with `-D warnings`, plus a lockfile comparison that
+  exempts the sibling path crates. Everything it does lives in
+  `ci/rust/run.sh`, so this file and a local run cannot say different
+  things; `bash ci/rust/run.sh` is that local run.
+
+  It needs the sibling checkouts (`parser`, `json`, `jsonic`, `xml`,
+  `support`, `debug`) and no secrets. It clones them from `main` rather
+  than from a release, which is what the Go and TypeScript jobs already
+  do and what `test/spec/xml-layer.tsv` depends on.
