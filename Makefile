@@ -1,18 +1,18 @@
-# Build, test and publish both the TypeScript (ts/) and Go (go/)
-# implementations. ts/ is canonical; go/ tracks it.
+# Build, test and publish the TypeScript (ts/), Go (go/) and Rust (rs/)
+# implementations. ts/ is canonical; go/ and rs/ track it.
 #
 # Local build/test resolve the unpublished @tabnas siblings via the
 # repo-set go.work + node_modules symlinks (admin/scripts/link.sh).
 
-.PHONY: all build test clean build-ts build-go test-ts test-go \
-        clean-ts clean-go publish-ts publish-go tags-go reset fetch \
-        prose prose-counts
+.PHONY: all build test clean build-ts build-go build-rs test-ts test-go \
+        test-rs clean-ts clean-go clean-rs publish-ts publish-go version-rs \
+        tags-go reset fetch prose prose-counts
 
 all: build test
 
-build: build-ts build-go
+build: build-ts build-go build-rs
 
-test: fetch test-ts test-go
+test: fetch test-ts test-go test-rs
 
 # Fetch the third-party conformance corpora (rubys/feedvalidator and
 # kurtmckee/feedparser) at their pinned commits. They are NEVER committed —
@@ -25,7 +25,7 @@ test: fetch test-ts test-go
 fetch:
 	node scripts/fetch-corpus.mjs all
 
-clean: clean-ts clean-go
+clean: clean-ts clean-go clean-rs
 
 # --- TypeScript (package in ts/) ---
 build-ts:
@@ -75,9 +75,43 @@ publish-go: test-go
 tags-go:
 	git tag -l 'go/v*' --sort=-version:refname
 
+# --- Rust (crate in rs/) ---
+#
+# The crate takes the engine, the jsonic base grammar, the xml grammar,
+# the fixture runner and the debug plugin as SIBLING CHECKOUTS by path;
+# none is published. ci/rust/run.sh is the full gate and checks for them
+# first. These targets are the fast inner loop.
+build-rs:
+	cd rs && cargo build --all-targets
+
+# `--all-targets` does NOT include doctests -- cargo documents the
+# selector as "Test all targets (does not include doctests)" -- so the
+# README examples need their own run or a stale one ships.
+test-rs:
+	cd rs && cargo test --all-targets && cargo test --doc
+	cd rs && cargo clippy --all-targets --all-features -- -D warnings
+
+clean-rs:
+	cd rs && cargo clean
+
+# Set the Rust crate version: make version-rs V=x.y.z
+#
+# Bumps BOTH Rust version sites, plus the crate's own entry in
+# rs/Cargo.lock, which ci/rust/run.sh compares against rs/Cargo.toml
+# before it runs anything. It does NOT touch ts/package.json or
+# go/feed.go: rs/tests/version_test.rs fails until all four agree, which
+# is the point.
+version-rs:
+	@test -n "$(V)" || (echo "Usage: make version-rs V=x.y.z" && exit 1)
+	sed -i.bak 's/^version = ".*"/version = "$(V)"/' rs/Cargo.toml
+	sed -i.bak 's/^pub const VERSION: &str = ".*";/pub const VERSION: \&str = "$(V)";/' rs/src/lib.rs
+	rm -f rs/Cargo.toml.bak rs/src/lib.rs.bak
+	cd rs && cargo metadata --format-version 1 --offline >/dev/null
+
 reset:
 	cd ts && npm run reset
 	cd go && go clean -cache && go build ./... && go test -v ./...
+	cd rs && cargo clean && cargo test --all-targets && cargo test --doc
 
 # The prose gate (see docs/STYLE-GUIDE.md). Vale over the reader-facing
 # pages, at the levels set in .vale.ini, on the same file list
