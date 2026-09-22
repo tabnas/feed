@@ -32,7 +32,7 @@ exported for callers working with `raw` output.
 | [`rs/`](rs/) | Rust port — crate `tabnas-feed`. Plugin + helpers in `rs/src/lib.rs`; `pub const VERSION` mirrors `ts/package.json`. See [`rs/AGENTS.md`](rs/AGENTS.md). |
 | [`test/divergent.tsv`](test/divergent.tsv) | The divergence register: where a port disagrees, with a column per runtime, executed rather than described. Argued in [`DIVERGENCE.md`](DIVERGENCE.md). |
 | [`test/spec/`](test/spec/) | Shared `.tsv` conformance fixtures. All three runtimes auto-discover this dir; the header row's second column name selects what is compared (`expected` = the parse result, `detect` = the dialect report). See [`test/AGENTS.md`](test/AGENTS.md). |
-| [`test/feedparser-wellformed/`](test/feedparser-wellformed/) | Vendored well-formed feed corpus from kurtmckee/feedparser (BSD 2-Clause), in `atom10/` `atom/` `rss/` `rdf/` subdirs. Both runtimes parse these and assert detection. See `THIRD_PARTY_NOTICES.md`. |
+| [`test/feedparser-wellformed/`](test/feedparser-wellformed/) | Vendored well-formed feed corpus from kurtmckee/feedparser (BSD 2-Clause), in `atom10/` `atom/` `rss/` `rdf/` subdirs. All three runtimes parse these and assert detection. See `THIRD_PARTY_NOTICES.md`. |
 | `test/feedvalidator/`, `test/feedparser/` | The full third-party conformance corpora, **fetched at a pinned commit and gitignored — never committed**. `make fetch` (or `scripts/fetch-feedvalidator.sh` / `scripts/fetch-feedparser.sh`) populates them. |
 | [`scripts/fetch-corpus.mjs`](scripts/fetch-corpus.mjs) | The fetcher, holding the pinned upstream SHAs. The two `.sh` wrappers are thin `exec`s over it so `npm pretest` works on Windows CI too. |
 | [`ts/doc/grammar.svg`](ts/doc/grammar.svg) / `grammar.txt` | Railroad diagram of the (xml) grammar, regenerated with `@tabnas/railroad`. |
@@ -91,15 +91,14 @@ Feed: the feed plugin pulls in Xml, and Xml/feed expect jsonic's lexer.
    dependency, the disagreement goes in `test/divergent.tsv` and
    `DIVERGENCE.md` rather than being softened in the fixture.
 2. The shared fixtures in `test/spec/*.tsv` are the **parity contract**.
-   Both suites enumerate the directory, parse each `.xml` with the
-   matching `format` option, and deep-equal the result against the
-   expected JSON after a JSON marshal/unmarshal round-trip (which
-   normalizes property ordering and types). Add a spec by dropping in the
-   `.xml` plus the expected `.json` file(s); both languages pick it up
-   automatically. Keep each spec minimal — one behavior per fixture.
-3. `detect` (TS) / `Detect` (Go) are part of the contract: the
-   `<name>.detect.json` fixtures pin `{ dialect, version }` and both
-   runtimes must agree. The dialect set is `atom` / `rss` / `rdf` /
+   All three suites enumerate the directory, parse each row's `input` with
+   the matching options, and deep-equal the result against the expected
+   JSON after a JSON round-trip (which normalizes property ordering and
+   types). Add a spec by dropping a `.tsv` in; all three languages pick it
+   up automatically. Keep each spec minimal — one behavior per fixture.
+3. `detect` (TS and Rust) / `Detect` (Go) are part of the contract: the
+   `detect` fixtures pin `{ dialect, version }` and all three runtimes must
+   agree. The dialect set is `atom` / `rss` / `rdf` /
    `unknown`; the version set is the `FeedVersion` union (`atom10`,
    `atom03`, `rss20`, `rss092`, `rss091u`, `rss091n`, `rss10`, `rss090`,
    `unknown`).
@@ -216,11 +215,12 @@ does not run is worse than no suite at all.
 `make publish-go V=x.y.z` seds `const VERSION` in `go/feed.go`, commits,
 tags `go/vX.Y.Z`, and (when `gh` is present) cuts a release.
 
-Both runtimes bake in a `VERSION` constant — `const VERSION` in `go/feed.go`,
-exported `VERSION` from `ts/src/feed.ts` — and both MUST equal
-`ts/package.json` "version". `go/version_test.go` and
-`ts/test/version.test.ts` fail the build if either drifts. They fail (never
-skip) if `ts/package.json` cannot be read.
+Both ports bake in a `VERSION` constant — `const VERSION` in `go/feed.go`,
+`pub const VERSION` in `rs/src/lib.rs` — as does the canonical
+`ts/src/feed.ts`, and all three MUST equal `ts/package.json` "version", as
+must `version` in `rs/Cargo.toml`. `go/version_test.go`,
+`ts/test/version.test.ts` and `rs/tests/version_test.rs` fail the build if
+any drifts. They fail (never skip) if `ts/package.json` cannot be read.
 
 ### Running the TypeScript half from a clean checkout
 
@@ -286,12 +286,12 @@ ax-stale-test-artifact` in tabnas/admin keeps it fixed.
 
 What "correct" means here, in order of authority:
 
-1. **The shared fixtures pass in BOTH runtimes.** `test/spec/*.tsv` is the
-   parity contract (`ts/test/parity.test.ts` / `go/parity_test.go`),
-   including the `detect` fixtures — a row green in one runtime and red in
-   the other is a failure, not a discrepancy.
+1. **The shared fixtures pass in ALL THREE runtimes.** `test/spec/*.tsv` is
+   the parity contract (`ts/test/parity.test.ts` / `go/parity_test.go` /
+   `rs/tests/parity_test.rs`), including the `detect` fixtures — a row green
+   in one runtime and red in another is a failure, not a discrepancy.
 2. **The conformance numbers do not regress.** The feedvalidator figures in
-   "Conformance" below are asserted in both runtimes; changing behaviour
+   "Conformance" below are asserted in all three runtimes; changing behaviour
    means re-measuring and updating them in the same commit, not later. A
    correct run reports `skipped 0` and zero Go `SKIP` lines — no suite here
    is allowed to silently not-run.

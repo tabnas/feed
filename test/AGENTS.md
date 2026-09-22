@@ -86,16 +86,19 @@ exact output — keep new behavioural cases here in `spec/` instead.
 `test/feedvalidator/` and `test/feedparser/` are the FULL third-party
 conformance corpora. They are **fetched** at a pinned commit by
 `scripts/fetch-corpus.mjs` (via `make fetch`, `ts/` `npm pretest`, or the Go
-harness on demand) into gitignored directories — never commit them. They
-cover breadth; keep new behavioural cases here in `spec/` instead.
+and Rust harnesses on demand) into gitignored directories — never commit
+them. They cover breadth; keep new behavioural cases here in `spec/` instead.
 
-Each corpus has a runner in both runtimes, and neither may `skip`: if the
+Each corpus has a runner in all three runtimes, and none may `skip`: if the
 corpus is missing they fail with fetch instructions.
 
-| Corpus | TypeScript | Go |
-|---|---|---|
-| `feedvalidator/` | `ts/test/feedvalidator.test.ts` | `TestFeedValidatorConformance` |
-| `feedparser/` | `ts/test/feedparser-conformance.test.ts` | `TestFeedParserConformance` |
+| Corpus | TypeScript | Go | Rust |
+|---|---|---|---|
+| `feedvalidator/` | `ts/test/feedvalidator.test.ts` | `TestFeedValidatorConformance` | `feedvalidator_conformance` |
+| `feedparser/` | `ts/test/feedparser-conformance.test.ts` | `TestFeedParserConformance` | `feedparser_conformance` |
+
+The Go and Rust entries live in `go/conformance_test.go` and
+`rs/tests/conformance_test.rs`.
 
 The feedparser runner checks the VALUE each document parses to, against the
 upstream `Expect:` annotation the corpus itself carries (`ts/test/
