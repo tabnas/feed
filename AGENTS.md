@@ -32,7 +32,7 @@ exported for callers working with `raw` output.
 | [`rs/`](rs/) | Rust port — crate `tabnas-feed`. Plugin + helpers in `rs/src/lib.rs`; `pub const VERSION` mirrors `ts/package.json`. See [`rs/AGENTS.md`](rs/AGENTS.md). |
 | [`test/divergent.tsv`](test/divergent.tsv) | The divergence register: where a port disagrees, with a column per runtime, executed rather than described. Argued in [`DIVERGENCE.md`](DIVERGENCE.md). |
 | [`test/spec/`](test/spec/) | Shared `.tsv` conformance fixtures. All three runtimes auto-discover this dir; the header row's second column name selects what is compared (`expected` = the parse result, `detect` = the dialect report). See [`test/AGENTS.md`](test/AGENTS.md). |
-| [`test/feedparser-wellformed/`](test/feedparser-wellformed/) | Vendored well-formed feed corpus from kurtmckee/feedparser (BSD 2-Clause), in `atom10/` `atom/` `rss/` `rdf/` subdirs. Both runtimes parse these and assert detection. See `THIRD_PARTY_NOTICES.md`. |
+| [`test/feedparser-wellformed/`](test/feedparser-wellformed/) | Vendored well-formed feed corpus from kurtmckee/feedparser (BSD 2-Clause), in `atom10/` `atom/` `rss/` `rdf/` subdirs. All three runtimes parse these and assert detection. See `THIRD_PARTY_NOTICES.md`. |
 | `test/feedvalidator/`, `test/feedparser/` | The full third-party conformance corpora, **fetched at a pinned commit and gitignored — never committed**. `make fetch` (or `scripts/fetch-feedvalidator.sh` / `scripts/fetch-feedparser.sh`) populates them. |
 | [`scripts/fetch-corpus.mjs`](scripts/fetch-corpus.mjs) | The fetcher, holding the pinned upstream SHAs. The two `.sh` wrappers are thin `exec`s over it so `npm pretest` works on Windows CI too. |
 | [`ts/doc/grammar.svg`](ts/doc/grammar.svg) / `grammar.txt` | Railroad diagram of the (xml) grammar, regenerated with `@tabnas/railroad`. |
@@ -42,22 +42,24 @@ There is no `package.json` `bin` — this package has no CLI.
 ## The tabnas dependencies (sibling checkout)
 
 Feed sits two layers up the tabnas stack: it depends on **jsonic** and
-**xml**, which in turn depend on **parser**. All are resolved as sibling
-checkouts (none of the `@tabnas/*` packages are published yet):
+**xml**, which in turn depend on **parser**. The TypeScript and Go halves
+are published; the Rust crates are not, and resolve as sibling checkouts.
+Read the manifests rather than this list when the two disagree:
 
-- TypeScript `ts/package.json` `peerDependencies`:
-  - `@tabnas/jsonic`: `file:../../jsonic/ts`
-  - `@tabnas/xml`: `file:../../xml/ts`
-  - `@tabnas/parser`: `">=2"` (the engine; pulled in transitively, also
-    listed as a `file:` devDependency for local builds)
-  - The same three plus `@tabnas/debug` and `@tabnas/railroad` are
-    mirrored as `file:` `devDependencies` so a local `npm install`
-    resolves them. (Note: `jsonic` and `xml` use explicit `file:` peer
-    specs here rather than the usual `">=2"` — keep that as-is.)
-- Go `go/go.mod` requires `github.com/tabnas/jsonic/go` and
-  `github.com/tabnas/xml/go` with `replace` directives pointing at
-  `../../jsonic/go` and `../../xml/go`. It does **not** require
-  `parser/go` directly — that comes transitively through jsonic and xml.
+- TypeScript `ts/package.json` `peerDependencies` are `@tabnas/jsonic`,
+  `@tabnas/parser` and `@tabnas/xml`, each `">=0"`. The same three plus
+  `@tabnas/debug`, `@tabnas/railroad` and `@tabnas/support` are
+  `devDependencies` at `"*"`, so a plain `npm install` takes the REGISTRY
+  build of each. Nothing here pins a `file:` path: a checkout that must
+  resolve a sibling is linked after the install (see "Running the
+  TypeScript half from a clean checkout" below), which is also what CI
+  does.
+- Go `go/go.mod` requires `github.com/tabnas/jsonic/go`,
+  `github.com/tabnas/support/go` and `github.com/tabnas/xml/go`, with
+  `github.com/tabnas/json/go` and `github.com/tabnas/parser/go` indirect.
+  It carries **no `replace` directives** — that is the committed state and
+  the release check in "Releasing" asserts it. A sibling resolution comes
+  from a `go.work` kept one level up, never from a `replace` in this repo.
 
 - Rust `rs/Cargo.toml` takes every dependency by PATH, because none of the
   crates is published: `tabnas` (`../../parser/rs`), `tabnas-jsonic`
@@ -71,7 +73,7 @@ Clone the transitive closure as siblings of this repo and build their TS
 first (`cd <dep>/ts && npm install && npm run build`), then work here. CI
 clones and builds them all in order (see below).
 
-Both test suites construct a parser as **jsonic + Feed**, not parser +
+All three test suites construct a parser as **jsonic + Feed**, not parser +
 Feed: the feed plugin pulls in Xml, and Xml/feed expect jsonic's lexer.
 
 - TS: `new Tabnas().use(jsonic).use(Feed)` (or `.use(Feed, { format })`).
@@ -89,15 +91,14 @@ Feed: the feed plugin pulls in Xml, and Xml/feed expect jsonic's lexer.
    dependency, the disagreement goes in `test/divergent.tsv` and
    `DIVERGENCE.md` rather than being softened in the fixture.
 2. The shared fixtures in `test/spec/*.tsv` are the **parity contract**.
-   Both suites enumerate the directory, parse each `.xml` with the
-   matching `format` option, and deep-equal the result against the
-   expected JSON after a JSON marshal/unmarshal round-trip (which
-   normalizes property ordering and types). Add a spec by dropping in the
-   `.xml` plus the expected `.json` file(s); both languages pick it up
-   automatically. Keep each spec minimal — one behavior per fixture.
-3. `detect` (TS) / `Detect` (Go) are part of the contract: the
-   `<name>.detect.json` fixtures pin `{ dialect, version }` and both
-   runtimes must agree. The dialect set is `atom` / `rss` / `rdf` /
+   All three suites enumerate the directory, parse each row's `input` with
+   the matching options, and deep-equal the result against the expected
+   JSON after a JSON round-trip (which normalizes property ordering and
+   types). Add a spec by dropping a `.tsv` in; all three languages pick it
+   up automatically. Keep each spec minimal — one behavior per fixture.
+3. `detect` (TS and Rust) / `Detect` (Go) are part of the contract: the
+   `detect` fixtures pin `{ dialect, version }` and all three runtimes must
+   agree. The dialect set is `atom` / `rss` / `rdf` /
    `unknown`; the version set is the `FeedVersion` union (`atom10`,
    `atom03`, `rss20`, `rss092`, `rss091u`, `rss091n`, `rss10`, `rss090`,
    `unknown`).
@@ -201,24 +202,52 @@ Or via the top-level `Makefile` (ts canonical, go tracks it):
 
 ```bash
 make fetch        # third-party corpora at their pinned SHAs (idempotent)
-make build        # build-ts then build-go
-make test         # fetch, then test-ts then test-go
+make build        # build-ts, build-go, build-rs
+make test         # fetch, then test-ts, test-go, test-rs
 make reset        # ts npm reset + go clean/build/test
 ```
 
 `make test` depends on `fetch`, `ts/package.json` has it as `pretest`, and
-the Go harness re-runs the fetcher itself if the corpus is missing — three
-independent paths, because a conformance suite that silently does not run is
-worse than no suite at all.
+the Go and Rust harnesses each re-run the fetcher themselves if the corpus is
+missing — four independent paths, because a conformance suite that silently
+does not run is worse than no suite at all.
 
 `make publish-go V=x.y.z` seds `const VERSION` in `go/feed.go`, commits,
 tags `go/vX.Y.Z`, and (when `gh` is present) cuts a release.
 
-Both runtimes bake in a `VERSION` constant — `const VERSION` in `go/feed.go`,
-exported `VERSION` from `ts/src/feed.ts` — and both MUST equal
-`ts/package.json` "version". `go/version_test.go` and
-`ts/test/version.test.ts` fail the build if either drifts. They fail (never
-skip) if `ts/package.json` cannot be read.
+Both ports bake in a `VERSION` constant — `const VERSION` in `go/feed.go`,
+`pub const VERSION` in `rs/src/lib.rs` — as does the canonical
+`ts/src/feed.ts`, and all three MUST equal `ts/package.json` "version", as
+must `version` in `rs/Cargo.toml`. `go/version_test.go`,
+`ts/test/version.test.ts` and `rs/tests/version_test.rs` fail the build if
+any drifts. They fail (never skip) if `ts/package.json` cannot be read.
+
+### Running the TypeScript half from a clean checkout
+
+`ts/` ships **no `node_modules` and no lockfile** — `package-lock.json` is
+gitignored, deliberately, under "Never commit the local wiring" below. So a
+fresh clone cannot run the shared-fixture contract until two things happen,
+and the second is the one that is easy to miss:
+
+1. `cd ts && npm install`. The `@tabnas/*` devDependencies are `"*"`, so this
+   takes the **registry** build of each.
+2. Point the `@tabnas/*` packages at the sibling checkouts, if the change you
+   are verifying depends on an unreleased one. `test/spec/xml-layer.tsv` pins
+   behaviour that arrived in `@tabnas/xml`, so a registry build older than the
+   row fails it — correctly. Replace `ts/node_modules/@tabnas/<dep>` with a
+   symlink to `../../../<dep>/ts` and build that sibling first
+   (`cd ../../<dep>/ts && npm install && npm run build`). This is what the CI
+   `ts` job's link step does, and it is local wiring: none of it may be
+   committed.
+
+`ts/test/doc-examples.test.ts` does not go through `node_modules` at all — it
+resolves `@tabnas/*` by filesystem path from the repository's parent — so an
+unbuilt sibling fails it with `MODULE_NOT_FOUND` however the install went.
+Building the siblings is the fix, not reinstalling.
+
+Whether a given `npm test` proved anything about the published packages or
+about your checkout depends entirely on which of the two states you are in.
+Say which one when reporting a result.
 
 ## Verify your work
 
@@ -226,7 +255,7 @@ The commands that prove a change is correct. Run them from the repo root
 unless stated:
 
 ```bash
-make build && make test      # both runtimes; `make test` runs `make fetch` first
+make build && make test      # all three runtimes; `make test` runs `make fetch` first
 ```
 
 Narrower, when iterating:
@@ -257,12 +286,12 @@ ax-stale-test-artifact` in tabnas/admin keeps it fixed.
 
 What "correct" means here, in order of authority:
 
-1. **The shared fixtures pass in BOTH runtimes.** `test/spec/*.tsv` is the
-   parity contract (`ts/test/parity.test.ts` / `go/parity_test.go`),
-   including the `detect` fixtures — a row green in one runtime and red in
-   the other is a failure, not a discrepancy.
+1. **The shared fixtures pass in ALL THREE runtimes.** `test/spec/*.tsv` is
+   the parity contract (`ts/test/parity.test.ts` / `go/parity_test.go` /
+   `rs/tests/parity_test.rs`), including the `detect` fixtures — a row green
+   in one runtime and red in another is a failure, not a discrepancy.
 2. **The conformance numbers do not regress.** The feedvalidator figures in
-   "Conformance" below are asserted in both runtimes; changing behaviour
+   "Conformance" below are asserted in all three runtimes; changing behaviour
    means re-measuring and updating them in the same commit, not later. A
    correct run reports `skipped 0` and zero Go `SKIP` lines — no suite here
    is allowed to silently not-run.
@@ -553,10 +582,11 @@ value as hostile text.
 - `rs/tests/divergent_test.rs` runs `test/divergent.tsv`, the register of
   rows where a port disagrees. It fails when a port regresses AND when one
   is repaired, so a recorded divergence cannot outlive its repair.
-- The Rust port has runners for the shared fixtures and the VENDORED
-  `test/feedparser-wellformed/` corpus, and none yet for the two FETCHED
-  corpora, so the conformance numbers below are a TypeScript and Go claim.
-  See [`rs/AGENTS.md`](rs/AGENTS.md).
+- `rs/tests/conformance_test.rs` runs BOTH fetched corpora, so the
+  conformance numbers below are a claim about all three runtimes rather
+  than about two. It fetches a missing corpus itself, by shelling out to
+  `scripts/fetch-corpus.mjs`, because `cargo test` has no pretest hook any
+  more than `go test` does. See [`rs/AGENTS.md`](rs/AGENTS.md).
 - `ts/test/feedparser.test.ts` / the Go equivalent run the vendored
   `test/feedparser-wellformed/` corpus and assert dialect/version
   detection per subdir.
@@ -566,7 +596,7 @@ value as hostile text.
   README files (`README.md`, `ts/README.md`, `go/README.md`).
 - `ts/test/debug-model.test.ts` is the optional `@tabnas/debug`
   composition test: it resolves the debug plugin dynamically and **skips**
-  unless `@tabnas/debug` is installed (a `file:` devDependency) or
+  unless `@tabnas/debug` is installed (a devDependency) or
   `TABNAS_DEBUG_PATH` points at a built checkout. It asserts the
   structured grammar model (rule set, `config.start`, plugin list, push
   edges) described under gotchas above. In a normal checkout the
@@ -575,11 +605,16 @@ value as hostile text.
 - `ts/test/perf.test.ts` / `go/perf_test.go` assert that reusing a parser
   instance is much faster than rebuilding one per parse.
 
-- `ts/test/feedvalidator.test.ts` / `TestFeedValidatorConformance` in
-  `go/conformance_test.go` run the **whole** `rubys/feedvalidator`
+- `ts/test/feedvalidator.test.ts`, `TestFeedValidatorConformance` in
+  `go/conformance_test.go` and `feedvalidator_conformance` in
+  `rs/tests/conformance_test.rs` run the **whole** `rubys/feedvalidator`
   `testcases/` tree and assert both halves — must-reject and must-accept,
-  plus dialect detection. The two are line-for-line equivalents; a TS/Go
+  plus dialect detection. The three are line-for-line equivalents; a
   divergence shows up as one going red. See "Conformance" below.
+- `ts/test/feedparser-conformance.test.ts`, `TestFeedParserConformance` and
+  `feedparser_conformance` do the same for the **whole**
+  `kurtmckee/feedparser` tree: parse, dialect, version, the ill-formed half,
+  and the value-level `Expect:` ratchet. Also line-for-line equivalents.
 
 **No test may silently not-run.** The `feedparser-wellformed` corpus is
 vendored, so it can never legitimately be absent: `loadDir` (TS) and
@@ -601,22 +636,33 @@ formal test suite at all). The two authoritative third-party corpora are
 `kurtmckee/feedparser`.
 
 **The feedvalidator corpus is wired into `make test`** — the whole
-`testcases/` tree, both halves asserted, in both runtimes
-(`ts/test/feedvalidator.test.ts` and `go/conformance_test.go`, which classify
-and assert identically). It is fetched, not vendored, so `make test` runs
-`make fetch` first and both harnesses fail loudly rather than skip when the
-corpus is absent.
+`testcases/` tree, both halves asserted, in all three runtimes
+(`ts/test/feedvalidator.test.ts`, `go/conformance_test.go` and
+`rs/tests/conformance_test.rs`, which classify and assert identically). It is
+fetched, not vendored, so `make test` runs `make fetch` first and every
+harness fails loudly rather than skip when the corpus is absent. `make test`
+reaches all three (`test: fetch test-ts test-go test-rs`), and the Rust
+harness also fetches a missing corpus itself, so `make test-rs` and
+`ci/rust/run.sh` need no separate fetch step.
 
 | Corpus | Measure | Result |
 |---|---|---|
-| rubys/feedvalidator `testcases/` | not-well-formed docs rejected | **18/18** (was 16/18) |
-| rubys/feedvalidator `testcases/` | well-formed RSS/Atom docs accepted | **1809/1809** (was 1796/1809) |
-| rubys/feedvalidator `testcases/` | detected dialect matches the corpus directory | **1108/1108** (was 1107/1108) |
+| rubys/feedvalidator `testcases/` | not-well-formed docs rejected | **18/18** |
+| rubys/feedvalidator `testcases/` | well-formed RSS/Atom docs accepted | **1809/1809** |
+| rubys/feedvalidator `testcases/` | detected dialect matches the corpus directory | **1108/1108** |
 
-"Was" is the same harness run against the last **published** `@tabnas/xml`
-(`v0.4.1`), which is what `GOWORK=off go test ./...` still resolves. All 16
-distinct files behind those three "was" numbers were XML-layer, not
-feed-layer, and every one is now fixed in the `xml` sibling:
+Those numbers hold under BOTH resolutions now, which was not true while this
+section was first written. `@tabnas/xml` has published the fixes: npm serves
+`0.7.7` and `go/go.mod` requires `github.com/tabnas/xml/go v0.7.7`, so
+`GOWORK=off go test -count=1 ./...` downloads the published module and
+reports the same three figures as the workspace run, with every
+`test/spec/xml-layer.tsv` row green. There is no longer a published-versus-
+sibling split to reproduce, and no red run to explain away.
+
+The history is worth keeping, because it is what those `xml-layer.tsv` rows
+pin. Against `@tabnas/xml` `v0.4.1` the same harness reported 16/18
+must-reject, 1796/1809 must-accept and 1107/1108 detect. All 16 distinct
+files behind those older numbers were XML-layer, not feed-layer:
 
 - 7 rejected for a UTF-8 BOM before `<?xml` (`unexpected character(s): <`);
 - 5 rejected `undeclared_entity` behind an unread external DTD subset, which
@@ -629,36 +675,34 @@ feed-layer, and every one is now fixed in the `xml` sibling:
   [66] admits only lowercase `&#x`) and a namespace name containing a
   newline.
 
-The mismatched-tag message no longer leaks its `$fsrc`/`$openname`
-placeholders either — under `GOWORK=off` it still reads `closing tag
-</$fsrc> does not match opening tag <$openname>`, which is the cleanest
-one-line demonstration of which module you resolved.
+The mismatched-tag message used to leak its `$fsrc`/`$openname`
+placeholders as well, reading `closing tag </$fsrc> does not match opening
+tag <$openname>`. It interpolates its operands in every resolution now.
 
-Those behaviours are pinned row-by-row, in both runtimes, in
+Those behaviours are pinned row-by-row, in all three runtimes, in
 [`test/spec/xml-layer.tsv`](test/spec/xml-layer.tsv) — the cheap
-proof-of-fix, without needing the corpus.
+proof-of-fix, without needing the corpus. Keep them: they are the reason a
+future `@tabnas/xml` regression is caught here in a second rather than in a
+corpus run.
 
-**CI is green on these numbers, because BOTH jobs resolve the sibling `xml`
-from its `main` — not the published package.** `polyglot-ci` clones the deps
-listed in `.github/workflows/ci.yml` and then:
+**CI resolves the sibling `xml` from its `main`, not the published package.**
+That no longer changes the result, but it still changes what a red run
+means, so know which one you are in. `polyglot-ci` clones the deps listed in
+`.github/workflows/ci.yml` and then:
 
 - **`go` job** — runs `go work use` over the clones, so `xml/go` resolves to
-  the sibling checkout. The `require github.com/tabnas/xml/go v0.4.1` in
-  `go/go.mod` is overridden by the workspace and never fetched.
+  the sibling checkout and the `require` in `go/go.mod` is never fetched.
 - **`ts` job** — after `npm i`, a link step replaces each installed
   `@tabnas/*` with a symlink to the sibling `ts/` (a *copy* on the Windows
   runner, where unprivileged symlinks are unreliable) and only then builds.
-  So `"@tabnas/xml": "*"` and the `0.4.1` pin in `ts/package-lock.json` are
-  both overridden too.
+  So the `"*"` devDependency specs are overridden too.
 
-The **published** versions are still unfixed, so the resolution you are in
-decides the result, and only the local published-resolution runs are red:
-`GOWORK=off go test ./...`, and a `ts/` whose `node_modules/@tabnas/xml` is
-the registry build rather than the symlink. Both give `16/18` must-reject,
-`1796/1809` must-accept, `1107/1108` detect, and 7 of the 9
-`xml-layer.tsv` rows red — exactly the "was" column above. That is expected
-until `@tabnas/xml` publishes; bump the `require` in `go/go.mod` and the
-lockfile then, and delete this paragraph.
+The consequence to hold on to: a CI green proves the SIBLING is good, and a
+`GOWORK=off` green proves the PUBLISHED module is good. Both are green
+today. When they diverge again, the difference is a dependency release, not
+a defect in this repo, and the way to say which is
+`go list -m github.com/tabnas/xml/go` — a bare module path means sibling, a
+path with a version means published.
 
 Do **not** "fix" a red published-resolution run by reverting an
 `xml-layer.tsv` row, skipping the conformance suites, or repointing a
@@ -669,40 +713,60 @@ The 18-document must-reject set is the 14 that upstream annotates
 `Expect: SAXError` plus 4 that are objectively not well-formed but carry an
 `Expect:` naming a validator-level diagnostic instead. Those 4 are listed by
 path, with the specific violation quoted, in `NOT_WELL_FORMED` /
-`notWellFormed` in the two harnesses — reclassified, not excused, and the set
-is asserted to be exactly those 4 so a fifth cannot be added silently.
+`notWellFormed` / `not_well_formed` in the three harnesses — reclassified, not
+excused, and the set is asserted to be exactly those 4 so a fifth cannot be
+added silently.
 
-The `kurtmckee/feedparser` corpus is fetched by the same `make fetch` but only
-its 48-file vendored subset (`test/feedparser-wellformed/`) is asserted today.
-Measured over the full tree with the default parser:
+The `kurtmckee/feedparser` corpus is fetched by the same `make fetch` and is
+now **asserted over the whole tree**, not just the 48-file vendored subset:
+`ts/test/feedparser-conformance.test.ts`, `TestFeedParserConformance` in
+`go/conformance_test.go` and `feedparser_conformance` in
+`rs/tests/conformance_test.rs` are line-for-line equivalents, as the
+feedvalidator trio is. The vendored subset keeps its own narrower harness
+(`ts/test/feedparser.test.ts`) because it is committed and must run without
+a fetch.
 
 | Corpus | Measure | Result |
 |---|---|---|
-| kurtmckee/feedparser `wellformed/` | RSS/Atom-rooted docs parse to an Atom shape | 1734/1734 (100%) |
-| kurtmckee/feedparser `illformed/` | docs annotated `Expect: bozo` are rejected | 5/19 whole dir; 4/14 of the annotated ones |
+| kurtmckee/feedparser `wellformed/` | RSS/Atom-rooted docs parse to an Atom shape | **1734/1734** |
+| kurtmckee/feedparser `wellformed/` | detected dialect matches the corpus directory | **1734/1734** |
+| kurtmckee/feedparser `wellformed/` | detected version matches the upstream annotation | **9/14** (5 enumerated) |
+| kurtmckee/feedparser `wellformed/` | upstream `Expect:` value assertions hold | **375/1360** (a floor) |
+| kurtmckee/feedparser `illformed/` | documents rejected | **6/19** (13 enumerated) |
 
-Those two rows are **measured, not asserted** — there is no harness behind
-them yet. Wiring one (including the value-level `Expect:` evaluator, where the
-real number is far worse than the parse-vs-error number) is the open Phase-2
-work; a draft lives on the `conformance-2026-08` branch. Do not quote the
-first row as a conformance result without saying it is unasserted.
+The value row is a **ratchet, not a pass line**. `VALUE_CORRECT_FLOOR` and
+`VALUE_CHECKED_FLOOR` in each of the three harnesses assert that at least 375
+of at least 1360 machine-checkable annotations hold; raise all six when a
+repair improves the number, and never lower any of them to get green. Lowering the DENOMINATOR is
+caught for the same reason: dropping checks to improve a ratio is the failure
+mode a bare percentage invites. The 1734 well-formed files carry 1548
+machine-checkable annotations in all, of which 188 use accessor paths this
+harness does not map — counted and printed rather than silently absorbed.
 
-### Still broken, and not ours to fix
+The two enumerated sets are enumerated, not excused: the 13 ill-formed files
+outside a string-input XML parser's reach, and the 5 version disagreements,
+are listed by path in all three harnesses and asserted to be exactly those
+sets, so a fourteenth or a sixth cannot be added silently.
 
-`@tabnas/xml` accepts a document with **no document element at all** —
-`<?xml version="1.0"?><!-- c -->` parses to `undefined` instead of raising.
-XML 1.0 §2.1 is `document ::= prolog element Misc*`: exactly one element is
-required. This is distinct from the trailing-content leniency that *was*
-fixed (`…</rss><extra/>` and `…</rss>junk` are both rejected now). It costs
-one file, `test/feedparser/illformed/rss_empty_document.xml`, and nothing in
-feedvalidator. Repro:
+### The empty-document hole is closed
+
+`@tabnas/xml` used to accept a document with **no document element at all**:
+`<?xml version="1.0"?><!-- c -->` parsed to `undefined` instead of raising,
+against XML 1.0 §2.1 (`document ::= prolog element Misc*`, exactly one element
+required). It cost one file,
+`test/feedparser/illformed/rss_empty_document.xml`, and nothing in
+feedvalidator.
+
+It raises now, in the published `@tabnas/xml` and in the sibling, which is
+the one file between the old 5/19 ill-formed figure and today's 6/19. Repro:
 
 ```js
 new Tabnas().use(jsonic).use(Xml).parse('<?xml version="1.0"?><!-- c -->')
-// returns undefined; should throw
+// throws: unexpected character(s)
 ```
 
-Fix belongs in `xml`, not here.
+The trailing-content leniency next to it was fixed earlier
+(`…</rss><extra/>` and `…</rss>junk` are both rejected).
 
 Out of the claim, and deliberately not asserted: 333 feedvalidator files whose
 document element is not `feed`/`rss`/`RDF` (KML, OpenSearch, OPML, RSS 1.1
@@ -719,8 +783,16 @@ sibling closure it must clone and build first:
 
 ```yaml
 with:
-  deps: "parser debug json abnf railroad jsonic xml"
+  deps: "parser support debug json jsonic xml"
 ```
+
+That string is copied from `.github/workflows/ci.yml`, and the workflow is
+the authority: if the two ever disagree, the workflow is what runs and this
+line is the stale one. It is the transitive closure this repo actually
+needs — `support` supplies the shared fixture loader, and neither `abnf` nor
+`railroad` is on the build path, despite `@tabnas/railroad` sitting in
+`ts/package.json` `devDependencies` for regenerating the railroad diagram by
+hand.
 
 `.github/workflows/release.yml` builds and publishes. Session credentials
 cannot write `.github/workflows/*` — changes there are promoted by a
