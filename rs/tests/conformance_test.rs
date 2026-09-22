@@ -391,3 +391,700 @@ fn feedvalidator_conformance() {
         fmt_fails(&fails)
     );
 }
+
+// --- feedparser -----------------------------------------------------------
+//
+// Twin of `ts/test/feedparser-conformance.test.ts` and
+// `TestFeedParserConformance` in `go/conformance_test.go`. The two
+// enumerated sets below and the two value floors are kept identical to
+// those twins, so a runtime divergence shows up as one side going red
+// rather than as three baselines drifting apart.
+
+// Measured on main at 7d2103f (2026-08-09): 375 of 1360 machine-checkable
+// upstream `Expect:` assertions hold. This is a RATCHET: raise both
+// numbers when the parser improves, never lower either to get green. The
+// denominator is floored too, so dropping value checks cannot be used to
+// improve the ratio.
+const FEEDPARSER_VALUE_CORRECT_FLOOR: usize = 375;
+const FEEDPARSER_VALUE_CHECKED_FLOOR: usize = 1360;
+
+const FEEDPARSER_WF_PREFIX: &str = "test/feedparser/wellformed/";
+const FEEDPARSER_ILL_PREFIX: &str = "test/feedparser/illformed/";
+
+/// Upstream's `illformed/` directory is keyed off feedparser's `bozo`
+/// flag, which is much broader than XML well-formedness. These documents
+/// are ACCEPTED by this crate and each is listed with the reason, so the
+/// set is a statement rather than an excuse. It is asserted to be EXACTLY
+/// this list: a newly-accepted ill-formed document is red, and so is a
+/// listed document that starts being rejected, whose entry must then be
+/// deleted.
+fn feedparser_accepted_illformed() -> BTreeMap<&'static str, &'static str> {
+    BTreeMap::from([
+        // Well-formed XML carrying an invalid DOCTYPE. Upstream itself
+        // annotates this `Expect: not bozo and feed['title'] == 'found'`,
+        // so accepting it is the CORRECT behaviour; it sits in illformed/
+        // for a different reason.
+        (
+            "always_strip_doctype.xml",
+            "well-formed; upstream Expect is `not bozo`, so accepting is correct",
+        ),
+        // Declared-versus-actual character encoding mismatches. Detecting
+        // these needs the raw byte stream and a charset detector; this
+        // crate is handed an already-decoded string, so the evidence is
+        // gone before it is called.
+        (
+            "chardet/big5.xml",
+            "encoding detection: needs raw bytes, not a decoded string",
+        ),
+        (
+            "chardet/eucjp.xml",
+            "encoding detection: needs raw bytes, not a decoded string",
+        ),
+        (
+            "chardet/euckr.xml",
+            "encoding detection: needs raw bytes, not a decoded string",
+        ),
+        (
+            "chardet/gb2312.xml",
+            "encoding detection: needs raw bytes, not a decoded string",
+        ),
+        (
+            "chardet/koi8r.xml",
+            "encoding detection: needs raw bytes, not a decoded string",
+        ),
+        (
+            "chardet/shiftjis.xml",
+            "encoding detection: needs raw bytes, not a decoded string",
+        ),
+        (
+            "chardet/tis620.xml",
+            "encoding detection: needs raw bytes, not a decoded string",
+        ),
+        (
+            "chardet/windows1255.xml",
+            "encoding detection: needs raw bytes, not a decoded string",
+        ),
+        // GeoRSS and GML coordinate errors. Well-formed XML; the defect is
+        // in the meaning of an extension element this crate does not
+        // model.
+        (
+            "geo/georss_point_no_coords.xml",
+            "GeoRSS semantics, not XML well-formedness",
+        ),
+        (
+            "geo/georss_polygon_insufficient_coords.xml",
+            "GeoRSS semantics, not XML well-formedness",
+        ),
+        (
+            "geo/gml_point.xml",
+            "GML semantics, not XML well-formedness",
+        ),
+        // Well-formed iso-8859-7 document; upstream records that the
+        // non-ASCII date crashed its own date parser. This crate does not
+        // parse dates.
+        (
+            "http_high_bit_date.xml",
+            "upstream records a date-parser crash, not a well-formedness defect",
+        ),
+    ])
+}
+
+/// Five documents where [`detect`] disagrees with the upstream
+/// annotation, each recorded with what this port currently reports, so
+/// the set is exact in both directions.
+fn feedparser_version_known_wrong() -> BTreeMap<&'static str, &'static str> {
+    BTreeMap::from([
+        // RSS 0.90 is an RDF document; detect reports the RDF-era RSS 1.0.
+        ("rss/rss_version_090.xml", "rss10"),
+        // Netscape and Userland 0.91 are told apart by the DOCTYPE, which
+        // detect does not read.
+        ("rss/rss_version_091_netscape.xml", "rss091u"),
+        // 0.93 and 0.94 are not modelled; both collapse onto 0.92.
+        ("rss/rss_version_093.xml", "rss092"),
+        ("rss/rss_version_094.xml", "rss092"),
+        // <rss> with no version attribute: upstream reports the bare 'rss'.
+        ("rss/rss_version_missing.xml", "rss20"),
+    ])
+}
+
+// --- the `Expect:` evaluator ----------------------------------------------
+//
+// Mirror of `ts/test/expect-eval.ts` and the Go twin. The supported form
+// is `not bozo and <path> == '<string>'`, with any number of `and`-joined
+// clauses. Everything else (time tuples, `len()`, `has_key()`, dict
+// literals, bare truthiness) is unsupported and COUNTED, never silently
+// passed.
+
+/// One step of an upstream accessor path: a property name or an array
+/// index.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Step {
+    Key(String),
+    Index(usize),
+}
+
+impl std::fmt::Display for Step {
+    fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Step::Key(key) => write!(out, "{key}"),
+            Step::Index(index) => write!(out, "{index}"),
+        }
+    }
+}
+
+struct ExpectClause {
+    path: String,
+    steps: Vec<Step>,
+    want: String,
+}
+
+/// The `Expect:` clauses of a corpus file, or `None` when the annotation
+/// is absent or in a form this evaluator does not support. `None` is
+/// counted by the caller, never treated as a pass.
+fn parse_expect(src: &str) -> Option<Vec<ExpectClause>> {
+    let expect = Regex::new(r"Expect:[ \t]*(.*)").expect("a valid pattern");
+    let clause = Regex::new(
+        r"^((?:feed|entries\[\d+\])(?:\[(?:'[^']*'|\d+)\])*)\s*==\s*'((?:[^'\\]|\\.)*)'$",
+    )
+    .expect("a valid pattern");
+    let head = Regex::new(r"^(?:feed|entries\[(\d+)\])").expect("a valid pattern");
+    let step = Regex::new(r"\[(?:'([^']*)'|(\d+))\]").expect("a valid pattern");
+    let paren = Regex::new(r"^\((.*)\)$").expect("a valid pattern");
+    let and = Regex::new(r"\s+and\s+").expect("a valid pattern");
+
+    let found = expect.captures(src)?;
+    let text = found[1].trim();
+    let rest = text.strip_prefix("not bozo and ")?.trim();
+
+    let mut out = Vec::new();
+    for part in and.split(rest) {
+        let part = part.trim();
+        let unwrapped = paren
+            .captures(part)
+            .map(|inner| inner[1].trim().to_string());
+        let part = unwrapped.as_deref().unwrap_or(part);
+        let matched = clause.captures(part)?;
+        let path = matched[1].to_string();
+
+        let mut steps = Vec::new();
+        let head_match = head.captures(&path).expect("the clause pattern implies it");
+        match head_match.get(1) {
+            None => steps.push(Step::Key("feed".to_string())),
+            Some(index) => {
+                steps.push(Step::Key("entries".to_string()));
+                steps.push(Step::Index(index.as_str().parse().unwrap_or(0)));
+            }
+        }
+        let tail = &path[head_match[0].len()..];
+        for found in step.captures_iter(tail) {
+            match (found.get(1), found.get(2)) {
+                (_, Some(index)) => steps.push(Step::Index(index.as_str().parse().unwrap_or(0))),
+                (Some(key), None) => steps.push(Step::Key(key.as_str().to_string())),
+                (None, None) => {}
+            }
+        }
+
+        let want = matched[2]
+            .replace("\\'", "'")
+            .replace("\\\"", "\"")
+            .replace("\\\\", "\\");
+        out.push(ExpectClause { path, steps, want });
+    }
+    if out.is_empty() {
+        return None;
+    }
+    Some(out)
+}
+
+fn feed_text(key: &str) -> Option<&'static str> {
+    match key {
+        "title" => Some("title"),
+        "subtitle" | "tagline" | "description" | "info" => Some("subtitle"),
+        "rights" | "copyright" => Some("rights"),
+        _ => None,
+    }
+}
+
+fn entry_text(key: &str) -> Option<&'static str> {
+    match key {
+        "title" => Some("title"),
+        "summary" | "description" => Some("summary"),
+        "rights" | "copyright" => Some("rights"),
+        _ => None,
+    }
+}
+
+fn person_key(key: &str) -> Option<&'static str> {
+    match key {
+        "name" => Some("name"),
+        "email" => Some("email"),
+        "href" | "url" | "uri" => Some("uri"),
+        _ => None,
+    }
+}
+
+/// feedparser reports text-construct types as MIME types; the Atom shape
+/// keeps RFC 4287's `text` / `html` / `xhtml` tokens.
+fn mime_of(token: &str) -> Option<&'static str> {
+    match token {
+        "text" => Some("text/plain"),
+        "html" => Some("text/html"),
+        "xhtml" => Some("application/xhtml+xml"),
+        _ => None,
+    }
+}
+
+type Json = serde_json::Value;
+
+fn mget(value: &Json, key: &str) -> Json {
+    value.get(key).cloned().unwrap_or(Json::Null)
+}
+
+fn aget(value: &Json, index: usize) -> Json {
+    value
+        .as_array()
+        .and_then(|items| items.get(index))
+        .cloned()
+        .unwrap_or(Json::Null)
+}
+
+fn first_alternate(links: &Json) -> Json {
+    let Some(items) = links.as_array() else {
+        return Json::Null;
+    };
+    for link in items {
+        let rel = mget(link, "rel");
+        let rel = rel.as_str().unwrap_or_default();
+        if rel.is_empty() || rel == "alternate" {
+            return mget(link, "href");
+        }
+    }
+    Json::Null
+}
+
+fn join_steps(steps: &[Step]) -> String {
+    steps
+        .iter()
+        .map(Step::to_string)
+        .collect::<Vec<_>>()
+        .join(".")
+}
+
+/// A text construct: bare is its `value`, `['value']` the same, and
+/// `['type']` the MIME spelling of its token.
+fn text_at(obj: &Json, prop: &str, tail: &[Step]) -> Result<Json, String> {
+    let text = mget(obj, prop);
+    if tail.is_empty() {
+        return Ok(mget(&text, "value"));
+    }
+    if tail.len() == 1 {
+        if let Step::Key(key) = &tail[0] {
+            if key == "value" {
+                return Ok(mget(&text, "value"));
+            }
+            if key == "type" {
+                let token = mget(&text, "type");
+                return Ok(match token.as_str().and_then(mime_of) {
+                    Some(mime) => Json::String(mime.to_string()),
+                    None => Json::Null,
+                });
+            }
+        }
+    }
+    Err(format!("detail.{}", join_steps(tail)))
+}
+
+/// Resolve an upstream accessor path against the Atom shape. `Ok` is a
+/// mapped path, whose value may legitimately be `null`; `Err` carries WHY
+/// the path has no mapping, which the caller tallies and prints.
+fn resolve_expect(feed: &Json, steps: &[Step]) -> Result<Json, String> {
+    let is_entry = steps.first() == Some(&Step::Key("entries".to_string()));
+    let (obj, path) = if is_entry {
+        let entries = mget(feed, "entries");
+        let Step::Index(index) = steps[1] else {
+            return Err("no such entry".to_string());
+        };
+        let entry = aget(&entries, index);
+        if entry.is_null() {
+            return Err("no such entry".to_string());
+        }
+        (entry, &steps[2..])
+    } else {
+        (feed.clone(), &steps[1..])
+    };
+
+    if path.is_empty() {
+        return Err("whole-object comparison".to_string());
+    }
+    let Step::Key(key) = &path[0] else {
+        return Err("index-at-root".to_string());
+    };
+    let tail = &path[1..];
+
+    let text = if is_entry { entry_text } else { feed_text };
+    if let Some(prop) = text(key) {
+        return text_at(&obj, prop, tail);
+    }
+    if let Some(stem) = key.strip_suffix("_detail") {
+        if let Some(prop) = text(stem) {
+            return text_at(&obj, prop, tail);
+        }
+    }
+
+    let index_at = |at: usize| match tail.get(at) {
+        Some(Step::Index(index)) => Some(*index),
+        _ => None,
+    };
+    let name_at = |at: usize| match tail.get(at) {
+        Some(Step::Key(key)) => key.as_str(),
+        _ => "",
+    };
+
+    match (key.as_str(), tail.len()) {
+        ("id" | "guid", 0) => return Ok(mget(&obj, "id")),
+        ("updated", 0) => return Ok(mget(&obj, "updated")),
+        ("published", 0) => return Ok(mget(&obj, "published")),
+        ("link", 0) => return Ok(first_alternate(&mget(&obj, "links"))),
+        ("links", 2) => {
+            if let Some(index) = index_at(0) {
+                if matches!(name_at(1), "href" | "rel" | "type" | "title") {
+                    return Ok(mget(&aget(&mget(&obj, "links"), index), name_at(1)));
+                }
+            }
+        }
+        ("author_detail", 1) => {
+            if let Some(prop) = person_key(name_at(0)) {
+                return Ok(mget(&aget(&mget(&obj, "authors"), 0), prop));
+            }
+        }
+        ("authors" | "contributors", 2) => {
+            if let (Some(index), Some(prop)) = (index_at(0), person_key(name_at(1))) {
+                return Ok(mget(&aget(&mget(&obj, key), index), prop));
+            }
+        }
+        ("tags", 2) => {
+            if let Some(index) = index_at(0) {
+                if matches!(name_at(1), "term" | "scheme" | "label") {
+                    return Ok(mget(&aget(&mget(&obj, "categories"), index), name_at(1)));
+                }
+            }
+        }
+        ("generator", 0) => return Ok(mget(&mget(&obj, "generator"), "value")),
+        ("content", 2) => {
+            if let Some(index) = index_at(0) {
+                if matches!(name_at(1), "value" | "type") {
+                    if index != 0 {
+                        return Err("content[n>0]".to_string());
+                    }
+                    let content = mget(&obj, "content");
+                    if name_at(1) == "type" {
+                        let token = mget(&content, "type");
+                        return Ok(match token.as_str().and_then(mime_of) {
+                            Some(mime) => Json::String(mime.to_string()),
+                            None => token,
+                        });
+                    }
+                    return Ok(mget(&content, "value"));
+                }
+            }
+        }
+        ("image", 1) if name_at(0) == "href" => return Ok(mget(&obj, "logo")),
+        ("source", _) if !tail.is_empty() => {
+            let source = mget(&obj, "source");
+            if source.is_null() {
+                return Ok(Json::Null);
+            }
+            let mut nested = vec![Step::Key("feed".to_string())];
+            nested.extend_from_slice(tail);
+            return resolve_expect(&source, &nested);
+        }
+        _ => {}
+    }
+
+    let prefix = if is_entry { "entry." } else { "feed." };
+    Err(format!("{prefix}{}", join_steps(path)))
+}
+
+/// The n most frequent keys of a tally, ties broken by key, so the line
+/// is stable between runs and between runtimes.
+fn top_counts(counts: &BTreeMap<String, usize>, n: usize) -> String {
+    let mut all: Vec<(&String, &usize)> = counts.iter().collect();
+    all.sort_by(|left, right| right.1.cmp(left.1).then(left.0.cmp(right.0)));
+    all.truncate(n);
+    all.iter()
+        .map(|(key, count)| format!("{key}({count})"))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+#[test]
+fn feedparser_conformance() {
+    let suite = require_corpus("feedparser", "fetch-feedparser.sh");
+    let wf_all = walk_xml(&suite.join("wellformed"));
+    let ill_all = walk_xml(&suite.join("illformed"));
+    // Floors on the corpus itself: a truncated fetch would otherwise
+    // shrink every denominator below and turn this green while measuring
+    // almost nothing.
+    assert!(
+        1000 < wf_all.len(),
+        "feedparser wellformed corpus looks truncated: {} files; \
+         re-run ./scripts/fetch-feedparser.sh",
+        wf_all.len()
+    );
+    assert!(
+        !ill_all.is_empty(),
+        "feedparser illformed corpus missing; re-run ./scripts/fetch-feedparser.sh"
+    );
+
+    // Documents whose root is not feed/rss/RDF are outside the README's
+    // claim (RSS 0.90 to 2.0, Atom 0.3 and 1.0): counted and printed,
+    // never asserted.
+    let wf: Vec<PathBuf> = wf_all
+        .iter()
+        .filter(|path| is_feed_root(&read_file(path)))
+        .cloned()
+        .collect();
+    let out_of_claim = wf_all.len() - wf.len();
+
+    let parser = conform_parser(FeedFormat::Atom);
+
+    // 1. Well-formed, so it must parse to the Atom shape.
+    let mut fails: Vec<String> = Vec::new();
+    for path in &wf {
+        match safe_parse(&parser, &read_file(path)) {
+            Err(error) => fails.push(format!("{}: {error}", rel_path(path))),
+            Ok(value) if !is_atom_shaped(&value) => {
+                fails.push(format!("{}: not an atom-shaped result", rel_path(path)));
+            }
+            Ok(_) => {}
+        }
+    }
+    println!(
+        "feedparser wellformed: {}/{} parsed (+{} non-RSS/Atom roots, outside the claim, \
+         not asserted)",
+        wf.len() - fails.len(),
+        wf.len(),
+        out_of_claim
+    );
+    assert!(
+        fails.is_empty(),
+        "parse failures ({}/{}):\n{}",
+        fails.len(),
+        wf.len(),
+        fmt_fails(&fails)
+    );
+
+    // 2. The value-level ratchet: upstream's own `Expect:` assertions.
+    let mut fails: Vec<String> = Vec::new();
+    let mut unmapped: BTreeMap<String, usize> = BTreeMap::new();
+    let (mut supported, mut correct, mut unmapped_files) = (0usize, 0usize, 0usize);
+    for path in &wf {
+        let src = read_file(path);
+        let Some(clauses) = parse_expect(&src) else {
+            continue;
+        };
+        supported += 1;
+        let parsed = match safe_parse(&parser, &src) {
+            Err(error) => {
+                fails.push(format!("{}: parse threw: {error}", rel_path(path)));
+                continue;
+            }
+            Ok(value) => value,
+        };
+        let shape = parsed.to_json();
+
+        let mut saw_unmapped = false;
+        let mut bad = String::new();
+        for clause in &clauses {
+            match resolve_expect(&shape, &clause.steps) {
+                Err(why) => {
+                    saw_unmapped = true;
+                    *unmapped.entry(why).or_insert(0) += 1;
+                }
+                Ok(value) => {
+                    if value.as_str() != Some(clause.want.as_str()) {
+                        bad = format!(
+                            "{} = {}, expected {:?}",
+                            clause.path,
+                            serde_json::to_string(&value)
+                                .unwrap_or_else(|_| "<unmarshalable>".to_string()),
+                            clause.want
+                        );
+                        break;
+                    }
+                }
+            }
+        }
+        if !bad.is_empty() {
+            fails.push(format!("{}: {bad}", rel_path(path)));
+        } else if saw_unmapped {
+            unmapped_files += 1;
+        } else {
+            correct += 1;
+        }
+    }
+    let checked = correct + fails.len();
+    println!(
+        "feedparser values: {correct}/{checked} correct ({supported} of {} files have a \
+         machine-checkable Expect; {unmapped_files} use paths this harness does not map \
+         — known gap)\n  top unmapped paths: {}",
+        wf.len(),
+        top_counts(&unmapped, 15)
+    );
+    assert!(
+        FEEDPARSER_VALUE_CHECKED_FLOOR <= checked,
+        "only {checked} value assertions were evaluated, was {FEEDPARSER_VALUE_CHECKED_FLOOR}. \
+         Value checks were LOST — fix the mapping, do not lower the floor."
+    );
+    assert!(
+        FEEDPARSER_VALUE_CORRECT_FLOOR <= correct,
+        "{correct}/{checked} upstream value assertions hold, was \
+         {FEEDPARSER_VALUE_CORRECT_FLOOR}. This is a REGRESSION.\n\
+         Sample of the {} current failures:\n{}",
+        fails.len(),
+        fmt_fails(&fails)
+    );
+    if FEEDPARSER_VALUE_CORRECT_FLOOR < correct {
+        println!(
+            "NOTE: value conformance improved to {correct}/{checked}; raise \
+             FEEDPARSER_VALUE_CORRECT_FLOOR (and both twins) to {correct}."
+        );
+    }
+
+    // 3. The ill-formed half, with the enumerated exceptions asserted in
+    //    both directions.
+    let accepted_illformed = feedparser_accepted_illformed();
+    let mut unexpectedly_accepted: Vec<String> = Vec::new();
+    let mut no_longer_accepted: Vec<String> = Vec::new();
+    for path in &ill_all {
+        let key = rel_path(path)
+            .strip_prefix(FEEDPARSER_ILL_PREFIX)
+            .unwrap_or_default()
+            .to_string();
+        let listed = accepted_illformed.contains_key(key.as_str());
+        let outcome = safe_parse(&parser, &read_file(path));
+        if outcome.is_ok() && !listed {
+            unexpectedly_accepted.push(format!("ACCEPTED but upstream marks it ill-formed: {key}"));
+        }
+        if outcome.is_err() && listed {
+            no_longer_accepted.push(format!(
+                "now REJECTED (good) — delete its entry from \
+                 feedparser_accepted_illformed: {key}"
+            ));
+        }
+    }
+    println!(
+        "feedparser illformed: {}/{} rejected ({} enumerated as outside a string-input \
+         XML parser's reach)",
+        ill_all.len() - accepted_illformed.len(),
+        ill_all.len(),
+        accepted_illformed.len()
+    );
+    assert!(
+        unexpectedly_accepted.is_empty(),
+        "must-reject failures:\n{}",
+        fmt_fails(&unexpectedly_accepted)
+    );
+    assert!(
+        no_longer_accepted.is_empty(),
+        "feedparser_accepted_illformed is now stale:\n{}",
+        fmt_fails(&no_longer_accepted)
+    );
+
+    // 4. Dialect and version detection. Both oracles come from the
+    //    corpus, never from this crate: the document element read out of
+    //    the source text, and the upstream `version == 'X'` annotation.
+    let raw = conform_parser(FeedFormat::Raw);
+
+    let mut fails: Vec<String> = Vec::new();
+    for path in &wf {
+        let src = read_file(path);
+        let want = match root_local_name(&src).as_str() {
+            "feed" => "atom",
+            "rss" => "rss",
+            "RDF" => "rdf",
+            _ => "",
+        };
+        match safe_parse(&raw, &src) {
+            Err(error) => fails.push(format!("{}: {error}", rel_path(path))),
+            Ok(root) => {
+                let got = detect(&root);
+                if got.dialect.as_str() != want {
+                    fails.push(format!(
+                        "{}: {} (root <{}>)",
+                        rel_path(path),
+                        got.dialect.as_str(),
+                        root_local_name(&src)
+                    ));
+                }
+            }
+        }
+    }
+    println!(
+        "feedparser dialect: {}/{} correct",
+        wf.len() - fails.len(),
+        wf.len()
+    );
+    assert!(
+        fails.is_empty(),
+        "dialect failures ({}/{}):\n{}",
+        fails.len(),
+        wf.len(),
+        fmt_fails(&fails)
+    );
+
+    let known_wrong = feedparser_version_known_wrong();
+    let version_annotation = Regex::new(r"version == '([a-z0-9]+)'").expect("a valid pattern");
+    let mut fails: Vec<String> = Vec::new();
+    let mut stale: Vec<String> = Vec::new();
+    let mut checked = 0usize;
+    for path in &wf {
+        let src = read_file(path);
+        let Some(found) = version_annotation.captures(&src) else {
+            continue;
+        };
+        checked += 1;
+        let want = found[1].to_string();
+        let key = rel_path(path)
+            .strip_prefix(FEEDPARSER_WF_PREFIX)
+            .unwrap_or_default()
+            .to_string();
+        let got = match safe_parse(&raw, &src) {
+            Err(error) => format!("THREW: {error}"),
+            Ok(root) => detect(&root).version.as_str().to_string(),
+        };
+        let listed = known_wrong.get(key.as_str()).copied();
+        if got == want {
+            if listed.is_some() {
+                stale.push(format!(
+                    "now correct — delete its feedparser_version_known_wrong entry: {key}"
+                ));
+            }
+        } else if listed != Some(got.as_str()) {
+            let extra = match listed {
+                Some(known) => format!(" (recorded as {known})"),
+                None => String::new(),
+            };
+            fails.push(format!("{key}: {got}, upstream says {want}{extra}"));
+        }
+    }
+    assert!(0 < checked, "no version annotations found — corpus wrong?");
+    println!(
+        "feedparser version: {}/{} correct ({} enumerated disagreements)",
+        checked - known_wrong.len(),
+        checked,
+        known_wrong.len()
+    );
+    assert!(
+        fails.is_empty(),
+        "version failures ({}/{}):\n{}",
+        fails.len(),
+        checked,
+        fmt_fails(&fails)
+    );
+    assert!(
+        stale.is_empty(),
+        "feedparser_version_known_wrong is stale:\n{}",
+        fmt_fails(&stale)
+    );
+}
