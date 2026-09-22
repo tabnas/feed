@@ -1,8 +1,10 @@
 input	expected	opts
 # Behaviours this repo depends on from @tabnas/xml, pinned in BOTH runtimes.
-# Every row here was a defect or an under-rejection in @tabnas/xml v0.4.1 and
-# is fixed in the sibling checkout; they are the difference between the
-# GOWORK=off and workspace-on feedvalidator numbers (see AGENTS.md).
+# Every row here was a defect or an under-rejection in @tabnas/xml v0.4.1.
+# All are fixed in the published crate and module as well as in the sibling
+# checkout, so these rows are green under every resolution now; they were the
+# difference between the GOWORK=off and workspace-on feedvalidator numbers
+# while the fixes were unreleased (see AGENTS.md).
 #
 # --- accepted, previously rejected ---------------------------------------
 # A UTF-8 BOM before the document element is stripped, not lexed as content.
