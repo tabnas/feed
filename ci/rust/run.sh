@@ -19,9 +19,16 @@
 # https://github.com/tabnas/support and https://github.com/tabnas/debug
 # next to this repo before running.
 #
-# No corpus is fetched here. The vendored test/feedparser-wellformed/ tree
-# is committed and the Rust suite FAILS rather than skips when it is
-# absent; the two fetched corpora have no Rust runner yet (rs/AGENTS.md).
+# Two kinds of corpus, and neither may silently not-run. The vendored
+# test/feedparser-wellformed/ tree is committed, so the suite FAILS rather
+# than skips when it is absent. The two FETCHED corpora
+# (test/feedvalidator/ and test/feedparser/) are gitignored, and
+# rs/tests/conformance_test.rs fetches them itself by shelling out to
+# `node ../scripts/fetch-corpus.mjs` before failing loudly -- the same
+# three-independent-paths arrangement the Go harness has, because
+# `cargo test` has no pretest hook either. So this script needs NODE and
+# network on a checkout that has not fetched yet; it needs neither once
+# the corpora are on disk, and the fetch is idempotent.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
