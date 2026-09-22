@@ -81,24 +81,29 @@ Namespaces in XML 1.0 by default: an undeclared prefix such as
 RSS/Atom have no single canonical test suite. The authoritative third-party
 corpus is **rubys/feedvalidator**, the suite behind the W3C Feed Validation
 Service, and the whole `testcases/` tree is wired into this repo's `make
-test`, with both halves asserted, in TypeScript and Go:
+test`, with both halves asserted:
 
 - 1809/1809 well-formed RSS/Atom documents accepted;
 - 1108/1108 with the dialect the corpus directory says they are;
 - 18/18 not-well-formed documents rejected.
 
-Separately, 1734/1734 (100%) of the RSS/Atom-rooted well-formed documents in
-**kurtmckee/feedparser** parse to an Atom shape: measured, but not yet
-asserted by a committed harness.
+The **kurtmckee/feedparser** tree is asserted too:
 
-Those three numbers are TypeScript and Go. The Rust port runs the shared
-fixtures and the vendored `feedparser-wellformed` corpus, and has no
-runner for the two fetched corpora yet, so it makes no conformance claim
-of its own; [`rs/AGENTS.md`](rs/AGENTS.md) says so in the same words.
+- 1734/1734 RSS/Atom-rooted well-formed documents parse to an Atom shape;
+- 1734/1734 with the dialect their document element says they are;
+- 6/19 ill-formed documents rejected, the other 13 listed by path with the
+  reason a string-input XML parser cannot reach them;
+- 375 of 1360 machine-checkable upstream `Expect:` value assertions hold,
+  a floor that may only be raised.
+
+Every number above holds in **all three runtimes**. TypeScript, Go and Rust
+run both corpora through harnesses written to classify and assert
+identically, so a runtime that disagreed would go red rather than report a
+second set of figures.
 
 See [`AGENTS.md`](AGENTS.md#conformance-what-is-actually-verified) for how
 the corpora are fetched, which documents fall outside the RSS/Atom claim, and
-the one remaining `@tabnas/xml` gap.
+what each enumerated set contains.
 
 ## Documentation
 

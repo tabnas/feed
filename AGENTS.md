@@ -203,15 +203,15 @@ Or via the top-level `Makefile` (ts canonical, go tracks it):
 
 ```bash
 make fetch        # third-party corpora at their pinned SHAs (idempotent)
-make build        # build-ts then build-go
-make test         # fetch, then test-ts then test-go
+make build        # build-ts, build-go, build-rs
+make test         # fetch, then test-ts, test-go, test-rs
 make reset        # ts npm reset + go clean/build/test
 ```
 
 `make test` depends on `fetch`, `ts/package.json` has it as `pretest`, and
-the Go harness re-runs the fetcher itself if the corpus is missing — three
-independent paths, because a conformance suite that silently does not run is
-worse than no suite at all.
+the Go and Rust harnesses each re-run the fetcher themselves if the corpus is
+missing — four independent paths, because a conformance suite that silently
+does not run is worse than no suite at all.
 
 `make publish-go V=x.y.z` seds `const VERSION` in `go/feed.go`, commits,
 tags `go/vX.Y.Z`, and (when `gh` is present) cuts a release.
@@ -255,7 +255,7 @@ The commands that prove a change is correct. Run them from the repo root
 unless stated:
 
 ```bash
-make build && make test      # both runtimes; `make test` runs `make fetch` first
+make build && make test      # all three runtimes; `make test` runs `make fetch` first
 ```
 
 Narrower, when iterating:
@@ -582,10 +582,11 @@ value as hostile text.
 - `rs/tests/divergent_test.rs` runs `test/divergent.tsv`, the register of
   rows where a port disagrees. It fails when a port regresses AND when one
   is repaired, so a recorded divergence cannot outlive its repair.
-- The Rust port has runners for the shared fixtures and the VENDORED
-  `test/feedparser-wellformed/` corpus, and none yet for the two FETCHED
-  corpora, so the conformance numbers below are a TypeScript and Go claim.
-  See [`rs/AGENTS.md`](rs/AGENTS.md).
+- `rs/tests/conformance_test.rs` runs BOTH fetched corpora, so the
+  conformance numbers below are a claim about all three runtimes rather
+  than about two. It fetches a missing corpus itself, by shelling out to
+  `scripts/fetch-corpus.mjs`, because `cargo test` has no pretest hook any
+  more than `go test` does. See [`rs/AGENTS.md`](rs/AGENTS.md).
 - `ts/test/feedparser.test.ts` / the Go equivalent run the vendored
   `test/feedparser-wellformed/` corpus and assert dialect/version
   detection per subdir.
@@ -604,13 +605,14 @@ value as hostile text.
 - `ts/test/perf.test.ts` / `go/perf_test.go` assert that reusing a parser
   instance is much faster than rebuilding one per parse.
 
-- `ts/test/feedvalidator.test.ts` / `TestFeedValidatorConformance` in
-  `go/conformance_test.go` run the **whole** `rubys/feedvalidator`
+- `ts/test/feedvalidator.test.ts`, `TestFeedValidatorConformance` in
+  `go/conformance_test.go` and `feedvalidator_conformance` in
+  `rs/tests/conformance_test.rs` run the **whole** `rubys/feedvalidator`
   `testcases/` tree and assert both halves — must-reject and must-accept,
-  plus dialect detection. The two are line-for-line equivalents; a TS/Go
+  plus dialect detection. The three are line-for-line equivalents; a
   divergence shows up as one going red. See "Conformance" below.
-- `ts/test/feedparser-conformance.test.ts` / `TestFeedParserConformance` in
-  `go/conformance_test.go` do the same for the **whole**
+- `ts/test/feedparser-conformance.test.ts`, `TestFeedParserConformance` and
+  `feedparser_conformance` do the same for the **whole**
   `kurtmckee/feedparser` tree: parse, dialect, version, the ill-formed half,
   and the value-level `Expect:` ratchet. Also line-for-line equivalents.
 
@@ -634,11 +636,14 @@ formal test suite at all). The two authoritative third-party corpora are
 `kurtmckee/feedparser`.
 
 **The feedvalidator corpus is wired into `make test`** — the whole
-`testcases/` tree, both halves asserted, in both runtimes
-(`ts/test/feedvalidator.test.ts` and `go/conformance_test.go`, which classify
-and assert identically). It is fetched, not vendored, so `make test` runs
-`make fetch` first and both harnesses fail loudly rather than skip when the
-corpus is absent.
+`testcases/` tree, both halves asserted, in all three runtimes
+(`ts/test/feedvalidator.test.ts`, `go/conformance_test.go` and
+`rs/tests/conformance_test.rs`, which classify and assert identically). It is
+fetched, not vendored, so `make test` runs `make fetch` first and every
+harness fails loudly rather than skip when the corpus is absent. `make test`
+reaches all three (`test: fetch test-ts test-go test-rs`), and the Rust
+harness also fetches a missing corpus itself, so `make test-rs` and
+`ci/rust/run.sh` need no separate fetch step.
 
 | Corpus | Measure | Result |
 |---|---|---|
@@ -708,14 +713,16 @@ The 18-document must-reject set is the 14 that upstream annotates
 `Expect: SAXError` plus 4 that are objectively not well-formed but carry an
 `Expect:` naming a validator-level diagnostic instead. Those 4 are listed by
 path, with the specific violation quoted, in `NOT_WELL_FORMED` /
-`notWellFormed` in the two harnesses — reclassified, not excused, and the set
-is asserted to be exactly those 4 so a fifth cannot be added silently.
+`notWellFormed` / `not_well_formed` in the three harnesses — reclassified, not
+excused, and the set is asserted to be exactly those 4 so a fifth cannot be
+added silently.
 
 The `kurtmckee/feedparser` corpus is fetched by the same `make fetch` and is
 now **asserted over the whole tree**, not just the 48-file vendored subset:
-`ts/test/feedparser-conformance.test.ts` and `TestFeedParserConformance` in
-`go/conformance_test.go` are line-for-line equivalents, as the feedvalidator
-pair is. The vendored subset keeps its own narrower harness
+`ts/test/feedparser-conformance.test.ts`, `TestFeedParserConformance` in
+`go/conformance_test.go` and `feedparser_conformance` in
+`rs/tests/conformance_test.rs` are line-for-line equivalents, as the
+feedvalidator trio is. The vendored subset keeps its own narrower harness
 (`ts/test/feedparser.test.ts`) because it is committed and must run without
 a fetch.
 
@@ -728,9 +735,9 @@ a fetch.
 | kurtmckee/feedparser `illformed/` | documents rejected | **6/19** (13 enumerated) |
 
 The value row is a **ratchet, not a pass line**. `VALUE_CORRECT_FLOOR` and
-`VALUE_CHECKED_FLOOR` in each harness assert that at least 375 of at least
-1360 machine-checkable annotations hold; raise both when a repair improves
-the number, and never lower either to get green. Lowering the DENOMINATOR is
+`VALUE_CHECKED_FLOOR` in each of the three harnesses assert that at least 375
+of at least 1360 machine-checkable annotations hold; raise all six when a
+repair improves the number, and never lower any of them to get green. Lowering the DENOMINATOR is
 caught for the same reason: dropping checks to improve a ratio is the failure
 mode a bare percentage invites. The 1734 well-formed files carry 1548
 machine-checkable annotations in all, of which 188 use accessor paths this
@@ -738,8 +745,8 @@ harness does not map — counted and printed rather than silently absorbed.
 
 The two enumerated sets are enumerated, not excused: the 13 ill-formed files
 outside a string-input XML parser's reach, and the 5 version disagreements,
-are listed by path in both harnesses and asserted to be exactly those sets, so
-a fourteenth or a sixth cannot be added silently.
+are listed by path in all three harnesses and asserted to be exactly those
+sets, so a fourteenth or a sixth cannot be added silently.
 
 ### The empty-document hole is closed
 

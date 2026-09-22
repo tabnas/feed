@@ -11,6 +11,7 @@ the parsed feed. This file covers only what is specific to this crate.
 |---|---|
 | `src/lib.rs` | everything: `FeedOptions`, `detect`, `convert`, the dialect parsers, the native-to-Atom mapping, `feed`, `plugin`, `make`, `make_with`, `parse` |
 | `tests/parity_test.rs` | every `../test/spec/*.tsv` fixture, plus the recorded-divergence exemption list and the named-column census |
+| `tests/conformance_test.rs` | both FETCHED corpora, `../test/feedvalidator/` and `../test/feedparser/`, including the `Expect:` evaluator |
 | `tests/divergent_test.rs` | `../test/divergent.tsv`, through `tabnas_support::Register` |
 | `tests/feed_test.rs` | in-language cases mirrored from `ts/test/feed.test.ts`, `ts/test/feedparser.test.ts` and `go/feed_test.go`, plus the JavaScript classes, the integer reader and the untrusted-input bounds |
 | `tests/debug_model_test.rs` | the composition test, mirrored from `ts/test/debug-model.test.ts` |
@@ -197,10 +198,36 @@ directory rather than skipping, exactly as `requireWellformed` fails in
 Go and `loadDir` fails in TypeScript. A suite that reports green having
 run nothing is indistinguishable from coverage that was never there.
 
-The two FETCHED corpora (`test/feedvalidator/` and `test/feedparser/`)
-have runners in TypeScript and Go and none here yet. That is the open
-work on this port, and it is the reason the conformance numbers in
-`../AGENTS.md` are not repeated as a Rust claim anywhere.
+The two FETCHED corpora (`../test/feedvalidator/` and
+`../test/feedparser/`) run here too, in `tests/conformance_test.rs`. They
+are gitignored rather than committed, so that file fetches a missing one
+itself by shelling out to `node ../scripts/fetch-corpus.mjs` and then
+FAILS if it is still absent: `cargo test` has no pretest hook any more
+than `go test` does, which is how a suite ends up never running. The
+consequence for the gate is that a checkout which has not fetched yet
+needs node and network once; `../ci/rust/run.sh` says so.
+
+The numbers this port reports are the numbers the other two report, which
+is the point of having a third harness rather than a second one:
+18/18 must-reject, 1809/1809 must-accept and 1108/1108 dialect over
+feedvalidator; 1734/1734 parsed, 1734/1734 dialect, 9/14 version, 6/19
+ill-formed rejected and 375 of 1360 value assertions over feedparser. The
+two enumerated sets and the two value floors are kept identical to the
+TypeScript and Go twins, so a divergence goes red on one side instead of
+becoming a third baseline.
+
+The value row is a RATCHET, not a pass line. Raise
+`FEEDPARSER_VALUE_CORRECT_FLOOR` in all three twins in the same commit
+when a repair improves the number; never lower it, and never lower the
+checked floor, which exists because dropping value checks would improve
+the ratio.
+
+Corpus files are read LOSSILY here (`String::from_utf8_lossy`). Several
+feedvalidator cases are not valid UTF-8 on purpose, and the other
+runtimes see them decoded: Node substitutes U+FFFD and Go's `string(b)`
+yields U+FFFD per invalid byte as the parser walks it. A strict read
+would make this port disagree with both over file IO rather than over
+parsing.
 
 ## Running it
 
