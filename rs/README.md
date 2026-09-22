@@ -273,6 +273,16 @@ recorded in [`../DIVERGENCE.md`](../DIVERGENCE.md) and executed as rows
 in [`../test/divergent.tsv`](../test/divergent.tsv). Every row of every
 shared fixture passes in this port, with no exemption.
 
+Both third-party conformance corpora run here as well, in
+`tests/conformance_test.rs`, and report the same figures as the
+TypeScript and Go suites: 18/18 not-well-formed documents rejected,
+1809/1809 accepted and 1108/1108 dialects correct over
+rubys/feedvalidator, and 1734/1734 parsed, 1734/1734 dialects correct,
+9/14 versions correct, 6/19 ill-formed rejected and 375 of 1360 upstream
+value assertions holding over kurtmckee/feedparser. Neither corpus is
+committed, so that file fetches a missing one and then fails rather than
+skipping.
+
 ## Build and test
 
 ```bash
