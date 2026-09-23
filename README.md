@@ -96,7 +96,7 @@ The **kurtmckee/feedparser** tree is asserted too:
 - 375 of 1360 machine-checkable upstream `Expect:` value assertions hold,
   a floor that may only be raised.
 
-Every number above holds in **all three runtimes**. TypeScript, Go and Rust
+Every number above holds in **all three runtimes**. TypeScript, Go, and Rust
 run both corpora through harnesses written to classify and assert
 identically, so a runtime that disagreed would go red rather than report a
 second set of figures.
