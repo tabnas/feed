@@ -860,8 +860,8 @@ cannot write `.github/workflows/*` — changes there are promoted by a
 maintainer via `tabnas/admin` `rollout/apply-ci-folders.sh` (admin
 `DECISIONS.md` ADR-8), so edit the org workflow, not this repo.
 
-The Rust gate is STAGED at [`ci/workflows/rust.yml`](ci/workflows/rust.yml)
-under that same ADR and is not promoted by an agent. It runs
+The Rust gate, [`.github/workflows/rust.yml`](.github/workflows/rust.yml),
+was staged under that same ADR and has been promoted. It runs
 `ci/rust/run.sh`, which is also what a contributor runs locally, so the
 two cannot say different things.
 
