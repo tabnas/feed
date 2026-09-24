@@ -855,13 +855,20 @@ needs — `support` supplies the shared fixture loader, and neither `abnf` nor
 `ts/package.json` `devDependencies` for regenerating the railroad diagram by
 hand.
 
-`.github/workflows/release.yml` builds and publishes. Session credentials
-cannot write `.github/workflows/*` — changes there are promoted by a
-maintainer via `tabnas/admin` `rollout/apply-ci-folders.sh` (admin
-`DECISIONS.md` ADR-8), so edit the org workflow, not this repo.
+`.github/workflows/release.yml` builds and publishes. What `ci.yml` runs
+lives in the org workflow, so change the matrix and steps there, not in
+this repo. This repo's own workflow files change in `.github/workflows/`
+itself, in a reviewed pull request: session credentials can push them
+(admin `DECISIONS.md` ADR-8, as amended 2026-09-24). They still cannot
+push tags, so a release goes through `workflow_dispatch` (see
+"Releasing"). A workflow with a template in admin `rollout/workflows/`
+changes in that template too (ADR-8 as amended), and the stamped
+`clib.yml` and `clib-release.yml` change only through admin
+`tasks/clib-template/` and a re-stamp; [`ci/README.md`](ci/README.md)
+names which is which.
 
 The Rust gate, [`.github/workflows/rust.yml`](.github/workflows/rust.yml),
-was staged under that same ADR and has been promoted. It runs
+was staged under `ci/` and has been promoted. It runs
 `ci/rust/run.sh`, which is also what a contributor runs locally, so the
 two cannot say different things.
 
