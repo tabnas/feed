@@ -42,7 +42,7 @@ sweep, an install or a fetch, a release, a wait on CI, a benchmark, a
 script or loop you write, and anything sent to the background.
 
 - **Minimal is enough.** One line with the step and a count, such as
-  `conformance: 412/1500 (27%)`, meets it. When no total is known, print
+  `conformance: 412 of 1500 (27%)`, meets it. When no total is known, print
   what is known (the step, the current item, the elapsed time) and say the
   percentage is unknown rather than inventing one.
 - **Build it into what you write.** A script or loop prints a line per
@@ -860,8 +860,8 @@ cannot write `.github/workflows/*` — changes there are promoted by a
 maintainer via `tabnas/admin` `rollout/apply-ci-folders.sh` (admin
 `DECISIONS.md` ADR-8), so edit the org workflow, not this repo.
 
-The Rust gate is STAGED at [`ci/workflows/rust.yml`](ci/workflows/rust.yml)
-under that same ADR and is not promoted by an agent. It runs
+The Rust gate, [`.github/workflows/rust.yml`](.github/workflows/rust.yml),
+was staged under that same ADR and has been promoted. It runs
 `ci/rust/run.sh`, which is also what a contributor runs locally, so the
 two cannot say different things.
 
