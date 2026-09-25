@@ -54,3 +54,5 @@ test/feedvalidator/
 # The build directory only. rs/Cargo.lock IS committed: ci/rust/run.sh
 # compares it against rs/Cargo.toml before and after cargo runs.
 target/
+
+.DS_Store
