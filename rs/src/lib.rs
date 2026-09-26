@@ -56,7 +56,7 @@ pub use tabnas::TabnasError as FeedError;
 /// This crate's version. It MUST equal `ts/package.json` `"version"` and
 /// `const VERSION` in `go/feed.go`; `tests/version_test.rs` fails the
 /// build if they drift.
-pub const VERSION: &str = "0.6.8";
+pub const VERSION: &str = "0.6.9";
 
 /// The name the plugin registers under, and so the namespace of its
 /// plugin options.
