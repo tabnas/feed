@@ -208,7 +208,7 @@ next to this repository and point at them:
 tabnas-feed = { path = "../feed/rs" }
 tabnas-xml = { path = "../xml/rs" }
 tabnas-jsonic = { path = "../jsonic/rs" }
-tabnas = { path = "../parser/rs" }
+tabnas = { package = "tabnas-parser", path = "../parser/rs" }
 ```
 
 All four entries are needed. A crate's dependencies are not passed on to

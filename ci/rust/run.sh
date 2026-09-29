@@ -6,7 +6,7 @@
 # The engine, the relaxed-JSON base grammar, the XML grammar this plugin
 # is layered on, the fixture runner and the debug plugin are PATH
 # DEPENDENCIES on sibling checkouts (rs/Cargo.toml:
-# `tabnas = { path = "../../parser/rs" }`,
+# `tabnas = { package = "tabnas-parser", path = "../../parser/rs" }`,
 # `tabnas-jsonic = { path = "../../jsonic/rs" }`,
 # `tabnas-xml = { path = "../../xml/rs" }`, and as dev-dependencies
 # `tabnas-support = { path = "../../support/rs" }` and
@@ -100,7 +100,7 @@ fi
 lock_without_sibling_versions() {
   awk '
     /^\[\[package\]\]$/                { sib = 0 }
-    /^name = "tabnas"$/                { sib = 1 }
+    /^name = "tabnas-parser"$/                { sib = 1 }
     /^name = "tabnas-debug"$/          { sib = 1 }
     /^name = "tabnas-json"$/           { sib = 1 }
     /^name = "tabnas-jsonic"$/         { sib = 1 }

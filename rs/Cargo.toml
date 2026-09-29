@@ -20,7 +20,7 @@ path = "src/lib.rs"
 # that checkout is needed too even though this crate does not name it.
 # None of them is published, so there is no registry version to fall back
 # on.
-tabnas = { path = "../../parser/rs" }
+tabnas = { package = "tabnas-parser", path = "../../parser/rs" }
 tabnas-jsonic = { path = "../../jsonic/rs" }
 tabnas-xml = { path = "../../xml/rs" }
 indexmap = "2"
