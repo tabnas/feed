@@ -101,8 +101,9 @@ Feed sits two layers up the tabnas stack: it depends on **jsonic** and
 are published; the Rust crates are not, and resolve as sibling checkouts.
 Read the manifests rather than this list when the two disagree:
 
-- TypeScript `ts/package.json` `peerDependencies` are `@tabnas/jsonic`,
-  `@tabnas/parser` and `@tabnas/xml`, each `">=0"`. The same three plus
+- TypeScript `ts/package.json` `peerDependencies` are `@tabnas/parser`
+  and `@tabnas/xml`, each `">=0"`. The TypeScript source never imports
+  `@tabnas/jsonic`: it arrives as xml's own peer. Those three plus
   `@tabnas/debug`, `@tabnas/railroad` and `@tabnas/support` are
   `devDependencies` at `"*"`, so a plain `npm install` takes the REGISTRY
   build of each. Nothing here pins a `file:` path: a checkout that must
