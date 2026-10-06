@@ -16,17 +16,16 @@ consume feeds from any source.
 ## Install
 
 ```bash
-npm install @tabnas/feed @tabnas/parser @tabnas/jsonic @tabnas/xml
+npm install @tabnas/feed @tabnas/parser @tabnas/xml
 ```
 
 ## One tiny example
 
 ```js
 const { Tabnas } = require('@tabnas/parser')
-const { jsonic } = require('@tabnas/jsonic')
 const { Feed } = require('@tabnas/feed')
 
-const j = new Tabnas().use(jsonic).use(Feed)
+const j = new Tabnas().use(Feed)
 const feed = j.parse('<rss version="2.0"><channel><title>My Blog</title></channel></rss>')
 
 feed.title    // => { type: 'text', value: 'My Blog' }

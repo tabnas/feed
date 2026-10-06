@@ -11,8 +11,8 @@ Go API and value types differ.
 
 ## A grammar plugin that contributes no grammar
 
-`feed` is a plugin for the [`jsonic`](https://github.com/tabnas/jsonic)
-parser (which wraps the `tabnas` engine), but it is an unusual one: it
+`feed` is a plugin for the [`tabnas`](https://github.com/tabnas/parser)
+engine (the one under the `jsonic` parser too), but it is an unusual one: it
 adds **no rules and no tokens** of its own. All the syntax it accepts is
 the XML grammar from [`github.com/tabnas/xml/go`](https://github.com/tabnas/xml)
 It supplies the `xml`, `element`, `content`, and `child` rules.
@@ -128,11 +128,11 @@ shape and value representation, not behaviour.
 
 | Aspect          | TypeScript                                | Go                                              |
 | --------------- | ----------------------------------------- | ----------------------------------------------- |
-| Engine          | `new Tabnas().use(jsonic).use(Feed, opts)`| `j := tabnasjsonic.Make(); j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults, opts)` |
+| Engine          | `new Tabnas().use(Feed, opts)`            | `j := tabnas.Make(); j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults, opts)` |
 | Options value   | `{ format: 'native' }` (object)           | `map[string]any{"format": "native"}`            |
 | Defaults        | implicit (`format` defaults to `'atom'`)  | explicit `tabnasfeed.Defaults` map you pass in        |
 | Parse result    | `j.parse(src)` returns the value          | `j.Parse(src)` returns `(any, error)`           |
-| Errors          | `parse` **throws** a `JsonicError`        | `Parse` **returns** a `*tabnasjsonic.JsonicError`     |
+| Errors          | `parse` **throws** a `TabnasError`        | `Parse` **returns** a `*tabnas.TabnasError`           |
 
 In Go you must handle the returned `error`; there is no exception. The
 plugin signals a feed-level error by setting `ctx.ParseErr`, which

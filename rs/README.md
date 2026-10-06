@@ -93,7 +93,7 @@ grammar sits beside another, use the engine's plugin entry point:
 
 ```rust
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut parser = tabnas_jsonic::make();
+    let mut parser = tabnas::Tabnas::new();
     parser.use_plugin(tabnas_feed::plugin(), None)?;
     let feed = parser.parse("<feed xmlns=\"http://www.w3.org/2005/Atom\"/>")?;
     assert_eq!(feed.to_json()["version"], "1.0");
@@ -196,22 +196,20 @@ every shared fixture pins.
 
 ## Install
 
-The `tabnas`, `tabnas-jsonic` and `tabnas-xml` crates are not published
-to a registry, so they are consumed as **sibling checkouts**, the
-standard tabnas development model. Clone
-`https://github.com/tabnas/parser`, `https://github.com/tabnas/jsonic`,
-`https://github.com/tabnas/json` and `https://github.com/tabnas/xml`
+The `tabnas` and `tabnas-xml` crates are consumed as **sibling
+checkouts**, the standard tabnas development model, so they are not
+fetched from a registry here: they are local clones. Clone
+`https://github.com/tabnas/parser` and `https://github.com/tabnas/xml`
 next to this repository and point at them:
 
 ```toml
 [dependencies]
 tabnas-feed = { path = "../feed/rs" }
 tabnas-xml = { path = "../xml/rs" }
-tabnas-jsonic = { path = "../jsonic/rs" }
 tabnas = { package = "tabnas-parser", path = "../parser/rs" }
 ```
 
-All four entries are needed. A crate's dependencies are not passed on to
+All three entries are needed. A crate's dependencies are not passed on to
 its dependents, so `tabnas-feed` alone does not put the others in your
 extern prelude, and the examples above that name them would not resolve.
 Only `FeedError` is re-exported.

@@ -1469,9 +1469,9 @@ pub fn convert(root: &Value, format: FeedFormat) -> Result<Value, String> {
 
 // --- The plugin -----------------------------------------------------------
 
-/// Install the feed plugin on `parser`, which should already carry the
-/// jsonic grammar (as [`make`] arranges): the port of the `Feed` plugin
-/// function.
+/// Install the feed plugin on `parser`: the port of the `Feed` plugin
+/// function. The bare engine is enough, as [`make`] arranges: the XML
+/// grammar this installs is the whole grammar a feed needs.
 ///
 /// The plugin contributes no rules. It installs [`tabnas_xml`] with
 /// `strictNamespaces` from the options and hooks the existing `xml`
@@ -1480,7 +1480,7 @@ pub fn convert(root: &Value, format: FeedFormat) -> Result<Value, String> {
 /// carries the plugin is left alone.
 ///
 /// ```
-/// let mut parser = tabnas_jsonic::make();
+/// let mut parser = tabnas::Tabnas::new();
 /// tabnas_feed::feed(&mut parser, &tabnas_feed::FeedOptions::default())?;
 /// let value = parser.parse("<rss version=\"2.0\"><channel><title>x</title></channel></rss>")?;
 /// assert_eq!(value.to_json()["title"]["value"], "x");
@@ -1543,7 +1543,7 @@ pub fn feed(parser: &mut Tabnas, options: &FeedOptions) -> Result<(), PluginErro
 /// read from the plugin option bag with [`FeedOptions::from_value`].
 ///
 /// ```
-/// let mut parser = tabnas_jsonic::make();
+/// let mut parser = tabnas::Tabnas::new();
 /// parser.use_plugin(tabnas_feed::plugin(), None)?;
 /// let value = parser.parse("<feed xmlns=\"http://www.w3.org/2005/Atom\"/>")?;
 /// assert_eq!(value.to_json()["version"], "1.0");
@@ -1556,9 +1556,9 @@ pub fn plugin() -> Plugin {
     .with_defaults(FeedOptions::default().to_value())
 }
 
-/// Build a feed parser with caller options: the jsonic grammar, then this
-/// plugin, the `new Tabnas().use(jsonic).use(Feed, options)` of the
-/// canonical package.
+/// Build a feed parser with caller options: the engine, then this
+/// plugin, the `new Tabnas().use(Feed, options)` of the canonical package
+/// and the parser Go's C library builds with `tabnas.Make()`.
 ///
 /// ```
 /// let options = tabnas_feed::FeedOptions {
@@ -1571,10 +1571,10 @@ pub fn plugin() -> Plugin {
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub fn make_with(options: &FeedOptions) -> Tabnas {
-    let mut parser = tabnas_jsonic::make();
+    let mut parser = Tabnas::new();
     parser
         .use_plugin(plugin(), Some(options.to_value()))
-        .expect("the feed plugin installs on a jsonic instance");
+        .expect("the feed plugin installs on the engine");
     parser
 }
 

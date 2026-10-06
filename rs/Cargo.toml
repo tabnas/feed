@@ -12,16 +12,11 @@ name = "tabnas_feed"
 path = "src/lib.rs"
 
 [dependencies]
-# The engine, the relaxed-JSON base grammar and the XML grammar this
-# plugin is layered on are consumed as SIBLING CHECKOUTS, the standard
-# tabnas development model: clone https://github.com/tabnas/parser,
-# https://github.com/tabnas/jsonic and https://github.com/tabnas/xml next
-# to this repo. jsonic in turn takes tabnas-json from ../../json/rs, so
-# that checkout is needed too even though this crate does not name it.
-# None of them is published, so there is no registry version to fall back
-# on.
+# The engine and the XML grammar this plugin is layered on are consumed as
+# SIBLING CHECKOUTS, the standard tabnas development model: clone
+# https://github.com/tabnas/parser and https://github.com/tabnas/xml next
+# to this repo. `make`, `make_with` and `parse` build on the engine alone.
 tabnas = { package = "tabnas-parser", path = "../../parser/rs" }
-tabnas-jsonic = { path = "../../jsonic/rs" }
 tabnas-xml = { path = "../../xml/rs" }
 indexmap = "2"
 regex = "1.10"
@@ -34,3 +29,8 @@ tabnas-support = { path = "../../support/rs", features = ["serde_json"] }
 # The composition test mirrors ts/test/debug-model.test.ts, which asserts
 # that this plugin contributes no rules of its own.
 tabnas-debug = { path = "../../debug/rs" }
+# The relaxed-JSON grammar, for the tests only: they build the parser the
+# canonical suites build, `new Tabnas().use(jsonic).use(Feed)`. Clone
+# https://github.com/tabnas/jsonic next to this repo; it takes tabnas-json
+# from ../../json/rs, so that checkout is needed too.
+tabnas-jsonic = { path = "../../jsonic/rs" }

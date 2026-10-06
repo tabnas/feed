@@ -3,14 +3,14 @@
 # quietly drift apart: .github/workflows/rust.yml runs this file, and so can
 # you. `make test-rs` is the fast inner loop; this is the full gate.
 #
-# The engine, the relaxed-JSON base grammar, the XML grammar this plugin
-# is layered on, the fixture runner and the debug plugin are PATH
-# DEPENDENCIES on sibling checkouts (rs/Cargo.toml:
+# The engine, the XML grammar this plugin is layered on, and for the tests
+# the relaxed-JSON jsonic grammar, the fixture runner and the debug plugin
+# are PATH DEPENDENCIES on sibling checkouts (rs/Cargo.toml:
 # `tabnas = { package = "tabnas-parser", path = "../../parser/rs" }`,
-# `tabnas-jsonic = { path = "../../jsonic/rs" }`,
 # `tabnas-xml = { path = "../../xml/rs" }`, and as dev-dependencies
-# `tabnas-support = { path = "../../support/rs" }` and
-# `tabnas-debug = { path = "../../debug/rs" }`). jsonic in turn takes
+# `tabnas-support = { path = "../../support/rs" }`,
+# `tabnas-debug = { path = "../../debug/rs" }` and
+# `tabnas-jsonic = { path = "../../jsonic/rs" }`). jsonic in turn takes
 # `tabnas-json` from `../../json/rs`, so that checkout is needed too even
 # though this crate does not name it. None is published, so there is no
 # registry version to fall back on. Clone

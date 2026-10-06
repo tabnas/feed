@@ -40,7 +40,8 @@ Both of these were staged here and now run from `.github/workflows/`:
   `ci/rust/run.sh`, so the workflow and a local run cannot say different
   things; `bash ci/rust/run.sh` is that local run.
 
-  It needs the sibling checkouts (`parser`, `json`, `jsonic`, `xml`,
-  `support`, `debug`) and no secrets. It clones them from `main` rather
-  than from a release, which is what the Go and TypeScript jobs already
-  do and what `test/spec/xml-layer.tsv` depends on.
+  It needs the sibling checkouts (`parser` and `xml`, and for the tests
+  `json`, `jsonic`, `support` and `debug`) and no secrets. It clones
+  them from `main` rather than from a release, which is what the Go and
+  TypeScript jobs already do and what `test/spec/xml-layer.tsv` depends
+  on.

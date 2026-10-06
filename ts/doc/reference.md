@@ -31,18 +31,16 @@ there is no separate feed-parse function.
 
 ```ts
 import { Tabnas } from '@tabnas/parser'
-import { jsonic } from '@tabnas/jsonic'
 import { Feed } from '@tabnas/feed'
 
 const j = new Tabnas()
-  .use(jsonic)              // lexer + relaxed grammar
   .use(Feed, options?)     // pulls in @tabnas/xml, hooks conversion
 
 const result = j.parse(source)   // FeedResult
 ```
 
-`.use(jsonic)` must come first (it installs the lexer the XML grammar
-needs). `Feed` calls `tn.use(Xml)` internally, so you do **not** have
+No other plugin has to come first (the XML grammar installs its own
+lexer). `Feed` calls `tn.use(Xml)` internally, so you do **not** have
 to register `@tabnas/xml` yourself, though installing it as a
 dependency is required.
 

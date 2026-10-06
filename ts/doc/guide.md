@@ -5,27 +5,25 @@ have the plugin installed (see the [tutorial](tutorial.md) for the
 basics). For full type lists, options, and the mapping tables, follow
 the links into the [reference](reference.md).
 
-Every recipe starts from a `Tabnas` engine with `jsonic` and `Feed`
+Every recipe starts from a `Tabnas` engine with `Feed`
 registered:
 
 ```js
 const { Tabnas } = require('@tabnas/parser')
-const { jsonic } = require('@tabnas/jsonic')
 const { Feed } = require('@tabnas/feed')
 ```
 
 ## Use it as a plugin
 
 `Feed` is a [`tabnas`](https://github.com/tabnas/parser) plugin. Register
-it after `jsonic` (it supplies the lexer/grammar) and `Feed` will pull
-in `@tabnas/xml` for you. Then `parse` any feed source:
+it on the engine and `Feed` will pull in `@tabnas/xml` (it supplies the
+lexer/grammar) for you. Then `parse` any feed source:
 
 ```js
 const { Tabnas } = require('@tabnas/parser')
-const { jsonic } = require('@tabnas/jsonic')
 const { Feed } = require('@tabnas/feed')
 
-const j = new Tabnas().use(jsonic).use(Feed)
+const j = new Tabnas().use(Feed)
 const feed = j.parse('<rss version="2.0"><channel><title>x</title></channel></rss>')
 
 feed.format        // => 'atom'
@@ -44,10 +42,9 @@ fields like `ttl`, `cloud`, or `skipDays`, register the plugin with
 
 ```js
 const { Tabnas } = require('@tabnas/parser')
-const { jsonic } = require('@tabnas/jsonic')
 const { Feed } = require('@tabnas/feed')
 
-const j = new Tabnas().use(jsonic).use(Feed, { format: 'native' })
+const j = new Tabnas().use(Feed, { format: 'native' })
 const native = j.parse(
   '<rss version="2.0"><channel><title>x</title>' +
   '<link>http://x</link><description>d</description>' +
@@ -84,10 +81,9 @@ the raw element tree from `@tabnas/xml` with `format: 'raw'`:
 
 ```js
 const { Tabnas } = require('@tabnas/parser')
-const { jsonic } = require('@tabnas/jsonic')
 const { Feed } = require('@tabnas/feed')
 
-const j = new Tabnas().use(jsonic).use(Feed, { format: 'raw' })
+const j = new Tabnas().use(Feed, { format: 'raw' })
 const tree = j.parse('<rss version="2.0"><channel><title>x</title></channel></rss>')
 
 tree.localName     // => 'rss'
@@ -104,10 +100,9 @@ nodes) and nested elements.
 
 ```js
 const { Tabnas } = require('@tabnas/parser')
-const { jsonic } = require('@tabnas/jsonic')
 const { Feed, detect } = require('@tabnas/feed')
 
-const j = new Tabnas().use(jsonic).use(Feed, { format: 'raw' })
+const j = new Tabnas().use(Feed, { format: 'raw' })
 
 const rss = j.parse('<rss version="2.0"><channel><title>x</title></channel></rss>')
 detect(rss)   // => { dialect: 'rss', version: 'rss20' }
@@ -131,10 +126,9 @@ A failed parse throws. Two kinds of failure can occur:
 
 ```js
 const { Tabnas } = require('@tabnas/parser')
-const { jsonic } = require('@tabnas/jsonic')
 const { Feed } = require('@tabnas/feed')
 
-const j = new Tabnas().use(jsonic).use(Feed)
+const j = new Tabnas().use(Feed)
 
 let message = ''
 try {
