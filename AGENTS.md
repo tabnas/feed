@@ -111,8 +111,11 @@ Read the manifests rather than this list when the two disagree:
   TypeScript half from a clean checkout" below), which is also what CI
   does.
 - Go `go/go.mod` requires `github.com/tabnas/jsonic/go`,
-  `github.com/tabnas/support/go` and `github.com/tabnas/xml/go`, with
-  `github.com/tabnas/json/go` and `github.com/tabnas/parser/go` indirect.
+  `github.com/tabnas/parser/go`, `github.com/tabnas/support/go` and
+  `github.com/tabnas/xml/go`, with `github.com/tabnas/json/go` indirect.
+  `go/feed.go` imports the engine as `tabnas` for the engine's types and
+  does not import jsonic; jsonic's own API is used by the stamped
+  `go/clib/core.go` (`host.Make()`) and by the tests.
   It carries **no `replace` directives** — that is the committed state and
   the release check in "Releasing" asserts it. A sibling resolution comes
   from a `go.work` kept one level up, never from a `replace` in this repo.
