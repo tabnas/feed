@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"strings"
 
-	jsonic "github.com/tabnas/jsonic/go"
+	tabnas "github.com/tabnas/parser/go"
 	xml "github.com/tabnas/xml/go"
 )
 
@@ -1234,7 +1234,7 @@ func Convert(root any, format string) (any, error) {
 // The result is an AtomFeed (default), an Rss2Feed / Rss1Feed
 // (when "format" is "native"), or the raw map[string]any XML element
 // tree (when "format" is "raw").
-func Feed(j *jsonic.Jsonic, options map[string]any) error {
+func Feed(j *tabnas.Tabnas, options map[string]any) error {
 	if j.Decoration("feed-init") != nil {
 		return nil
 	}
@@ -1264,9 +1264,9 @@ func Feed(j *jsonic.Jsonic, options map[string]any) error {
 	// own guard: only run when an element was actually parsed in *this*
 	// iteration (r.Child.Node is set), so the conversion happens exactly
 	// once on the same iteration that @xml-bc copied the element to root.
-	j.Rule("xml", func(rs *jsonic.RuleSpec, _ *jsonic.Parser) {
-		rs.AddBC(func(r *jsonic.Rule, ctx *jsonic.Context) {
-			if r.Child == nil || r.Child == jsonic.NoRule || r.Child.Node == nil {
+	j.Rule("xml", func(rs *tabnas.RuleSpec, _ *tabnas.Parser) {
+		rs.AddBC(func(r *tabnas.Rule, ctx *tabnas.Context) {
+			if r.Child == nil || r.Child == tabnas.NoRule || r.Child.Node == nil {
 				return
 			}
 			if r.Node == nil {
@@ -1274,8 +1274,8 @@ func Feed(j *jsonic.Jsonic, options map[string]any) error {
 			}
 			out, err := Convert(r.Node, format)
 			if err != nil {
-				ctx.ParseErr = &jsonic.Token{
-					Name: "#BD", Tin: jsonic.TinBD,
+				ctx.ParseErr = &tabnas.Token{
+					Name: "#BD", Tin: tabnas.TinBD,
 					Err: err.Error(), Why: err.Error(), Src: err.Error(),
 				}
 				return
