@@ -114,8 +114,10 @@ Read the manifests rather than this list when the two disagree:
   `github.com/tabnas/parser/go`, `github.com/tabnas/support/go` and
   `github.com/tabnas/xml/go`, with `github.com/tabnas/json/go` indirect.
   `go/feed.go` imports the engine as `tabnas` for the engine's types and
-  does not import jsonic; jsonic's own API is used by the stamped
-  `go/clib/core.go` (`host.Make()`) and by the tests.
+  does not import jsonic, and neither does the stamped C library:
+  `go/clib/core.go` builds its parser on the engine (`host.Make()`, host
+  `github.com/tabnas/parser/go`; admin's `tasks/clib-rollout.tsv`). jsonic
+  is required for the tests, which install the plugin on a jsonic engine.
   It carries **no `replace` directives** — that is the committed state and
   the release check in "Releasing" asserts it. A sibling resolution comes
   from a `go.work` kept one level up, never from a `replace` in this repo.
