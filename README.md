@@ -21,16 +21,15 @@ Docs, guides, the error reference and the playground: **[tabnas.dev](https://tab
 
 ```bash
 # TypeScript / JavaScript
-npm install @tabnas/feed @tabnas/parser @tabnas/jsonic @tabnas/xml
+npm install @tabnas/feed @tabnas/parser @tabnas/xml
 
 # Go
 go get github.com/tabnas/feed/go
 ```
 
 The Rust crate is not published. It is consumed as a path dependency on
-a sibling checkout, together with the engine, the jsonic base grammar
-and the XML grammar; [`rs/README.md`](rs/README.md) has the four
-entries.
+a sibling checkout, together with the engine and the XML grammar;
+[`rs/README.md`](rs/README.md) has the three entries.
 
 ## One tiny example
 
@@ -38,10 +37,9 @@ entries.
 
 ```ts
 import { Tabnas } from '@tabnas/parser'
-import { jsonic } from '@tabnas/jsonic'
 import { Feed } from '@tabnas/feed'
 
-const j = new Tabnas().use(jsonic).use(Feed)
+const j = new Tabnas().use(Feed)
 const feed = j.parse('<rss version="2.0"><channel><title>My Blog</title></channel></rss>')
 
 feed.title    // { type: 'text', value: 'My Blog' }
@@ -51,7 +49,7 @@ feed.format   // 'atom'
 **Go.** The same, returning a typed struct:
 
 ```go
-j := tabnasjsonic.Make()
+j := tabnas.Make()
 j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults)
 got, _ := j.Parse(`<rss version="2.0"><channel><title>My Blog</title></channel></rss>`)
 f := got.(tabnasfeed.AtomFeed)

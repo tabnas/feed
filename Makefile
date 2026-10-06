@@ -77,10 +77,10 @@ tags-go:
 
 # --- Rust (crate in rs/) ---
 #
-# The crate takes the engine, the jsonic base grammar, the xml grammar,
-# the fixture runner and the debug plugin as SIBLING CHECKOUTS by path;
-# none is published. ci/rust/run.sh is the full gate and checks for them
-# first. These targets are the fast inner loop.
+# The crate takes the engine, the xml grammar, and for its tests the
+# jsonic grammar, the fixture runner and the debug plugin as SIBLING
+# CHECKOUTS by path; none is published. ci/rust/run.sh is the full gate
+# and checks for them first. These targets are the fast inner loop.
 build-rs:
 	cd rs && cargo build --all-targets
 

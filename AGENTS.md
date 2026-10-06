@@ -96,14 +96,19 @@ There is no `package.json` `bin` — this package has no CLI.
 
 ## The tabnas dependencies (sibling checkout)
 
-Feed sits two layers up the tabnas stack: it depends on **jsonic** and
-**xml**, which in turn depend on **parser**. The TypeScript and Go halves
+Feed sits two layers up the tabnas stack: it depends on **xml**, which in
+turn depends on **parser**, the engine. No port depends on **jsonic** at
+run time (the maintainer's ruling of 2026-10-06 moved the Rust crate,
+and xml's TypeScript and Rust, off it); it is a development dependency
+in all three, for the test suites. The TypeScript and Go halves
 are published; the Rust crates are not, and resolve as sibling checkouts.
 Read the manifests rather than this list when the two disagree:
 
 - TypeScript `ts/package.json` `peerDependencies` are `@tabnas/parser`
   and `@tabnas/xml`, each `">=0"`. The TypeScript source never imports
-  `@tabnas/jsonic`: it arrives as xml's own peer. Those three plus
+  `@tabnas/jsonic`, and under the same ruling `@tabnas/xml` drops it as
+  a peer too (tabnas/xml#87, from xml's next release). Those two,
+  `@tabnas/jsonic`, and
   `@tabnas/debug`, `@tabnas/railroad` and `@tabnas/support` are
   `devDependencies` at `"*"`, so a plain `npm install` takes the REGISTRY
   build of each. Nothing here pins a `file:` path: a checkout that must
@@ -122,26 +127,36 @@ Read the manifests rather than this list when the two disagree:
   the release check in "Releasing" asserts it. A sibling resolution comes
   from a `go.work` kept one level up, never from a `replace` in this repo.
 
-- Rust `rs/Cargo.toml` takes every dependency by PATH, because none of the
-  crates is published: `tabnas` (`../../parser/rs`), `tabnas-jsonic`
-  (`../../jsonic/rs`, which brings `tabnas-json` from `../../json/rs`) and
-  `tabnas-xml` (`../../xml/rs`), plus `tabnas-support`
-  (`../../support/rs`) and `tabnas-debug` (`../../debug/rs`) as
-  dev-dependencies. `ci/rust/run.sh` checks for each checkout before it
+- Rust `rs/Cargo.toml` takes every dependency by PATH: `tabnas`
+  (`../../parser/rs`) and `tabnas-xml` (`../../xml/rs`), plus
+  `tabnas-support` (`../../support/rs`), `tabnas-debug`
+  (`../../debug/rs`) and `tabnas-jsonic` (`../../jsonic/rs`, which brings
+  `tabnas-json` from `../../json/rs`) as dev-dependencies. `make`,
+  `make_with` and `parse` build on the engine (`Tabnas::new()`), as Go's
+  C library does. `ci/rust/run.sh` checks for each checkout before it
   runs anything.
 
 Clone the transitive closure as siblings of this repo and build their TS
 first (`cd <dep>/ts && npm install && npm run build`), then work here. CI
 clones and builds them all in order (see below).
 
-All three test suites construct a parser as **jsonic + Feed**, not parser +
-Feed: the feed plugin pulls in Xml, and Xml/feed expect jsonic's lexer.
+All three test suites construct a parser as **jsonic + Feed**, as they
+always have. The bare engine, **parser + Feed**, gives the same results:
+the feed plugin pulls in Xml, which brings its own lexer. On 2026-10-06
+the two constructions agreed on every one of the 4,105 inputs under
+`test/` in TypeScript and in Rust (results and error codes; only the
+`[jsonic/...]` or `[tabnas/...]` tag of a rendered message differs), and
+Go's C library already builds on the engine. The docs show the engine,
+and Rust's `make` builds on it:
 
-- TS: `new Tabnas().use(jsonic).use(Feed)` (or `.use(Feed, { format })`).
-- Go: `j := jsonic.Make(); j.UseDefaults(feed.Feed, feed.Defaults, opts)`.
-- Rust: `tabnas_feed::make()`, `make_with(&options)`, or
+- TS: `new Tabnas().use(jsonic).use(Feed)` in the tests;
+  `new Tabnas().use(Feed)` in the docs (or `.use(Feed, { format })`).
+- Go: `j := jsonic.Make(); j.UseDefaults(feed.Feed, feed.Defaults, opts)`
+  in the tests; `tabnas.Make()` in the docs and the C library.
+- Rust: `tabnas_feed::make()` and `make_with(&options)` build on
+  `tabnas::Tabnas::new()`; the tests install
   `parser.use_plugin(tabnas_feed::plugin(), Some(options.to_value()))` on
-  a `tabnas_jsonic::make()` instance.
+  a `tabnas_jsonic::make()` instance (`common::parser_with`).
 
 ## Authority and alignment rules
 

@@ -13,11 +13,11 @@ grammar, see the [reference](reference.md). For how it all works, see
 ## 1. Install
 
 `@tabnas/feed` is a plugin for the [`tabnas`](https://github.com/tabnas/parser)
-parsing engine. Install it together with the engine, the jsonic
-grammar it builds on, and the XML plugin it layers over:
+parsing engine. Install it together with the engine and the XML plugin
+it layers over:
 
 ```bash
-npm install @tabnas/feed @tabnas/parser @tabnas/jsonic @tabnas/xml
+npm install @tabnas/feed @tabnas/parser @tabnas/xml
 ```
 
 ## 2. Parse a feed
@@ -26,10 +26,9 @@ Register the plugin on a `Tabnas` engine instance and call `parse`:
 
 ```js
 const { Tabnas } = require('@tabnas/parser')
-const { jsonic } = require('@tabnas/jsonic')
 const { Feed } = require('@tabnas/feed')
 
-const j = new Tabnas().use(jsonic).use(Feed)
+const j = new Tabnas().use(Feed)
 
 const result = j.parse(`
   <rss version="2.0">
@@ -54,10 +53,9 @@ In TypeScript the import is the same, and you can type the result:
 
 ```ts
 import { Tabnas } from '@tabnas/parser'
-import { jsonic } from '@tabnas/jsonic'
 import { Feed, type AtomFeed } from '@tabnas/feed'
 
-const j = new Tabnas().use(jsonic).use(Feed)
+const j = new Tabnas().use(Feed)
 const result = j.parse(rssSource) as AtomFeed
 ```
 
@@ -77,10 +75,9 @@ Notice three things in the output above:
 
 ```js
 const { Tabnas } = require('@tabnas/parser')
-const { jsonic } = require('@tabnas/jsonic')
 const { Feed } = require('@tabnas/feed')
 
-const j = new Tabnas().use(jsonic).use(Feed)
+const j = new Tabnas().use(Feed)
 const result = j.parse(
   '<rss version="2.0"><channel><title>My Blog</title>' +
   '<link>https://example.com/</link><description>Posts</description>' +
@@ -99,10 +96,9 @@ shape, so your reading code does not change:
 
 ```js
 const { Tabnas } = require('@tabnas/parser')
-const { jsonic } = require('@tabnas/jsonic')
 const { Feed } = require('@tabnas/feed')
 
-const j = new Tabnas().use(jsonic).use(Feed)
+const j = new Tabnas().use(Feed)
 const result = j.parse(
   '<feed xmlns="http://www.w3.org/2005/Atom">' +
   '<title>Example Feed</title>' +
@@ -126,10 +122,9 @@ throws. Catch it like any other exception:
 
 ```js
 const { Tabnas } = require('@tabnas/parser')
-const { jsonic } = require('@tabnas/jsonic')
 const { Feed } = require('@tabnas/feed')
 
-const j = new Tabnas().use(jsonic).use(Feed)
+const j = new Tabnas().use(Feed)
 
 let threw = false
 try {

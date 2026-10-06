@@ -13,7 +13,7 @@ Import path: `github.com/tabnas/feed/go`, package name `feed`.
 
 | Symbol                                | Kind     | Description                                  |
 | ------------------------------------- | -------- | -------------------------------------------- |
-| `Feed(j *tabnasjsonic.Jsonic, opts map[string]any) error` | func | Plugin entry point; register with `UseDefaults`. |
+| `Feed(j *tabnas.Tabnas, opts map[string]any) error` | func | Plugin entry point; register with `UseDefaults`. |
 | `Defaults`                            | `map[string]any` | `{"format": "atom", "strictNamespaces": true}`, merged with caller options. |
 | `Detect(root any) Detection`          | func     | Report dialect/version of a raw XML root.    |
 | `Convert(root any, format string) (any, error)` | func | Turn a raw element tree into the requested shape. |
@@ -27,11 +27,11 @@ Public types: `Detection`, `AtomFeed`, `AtomEntry`, `AtomEntrySource`,
 
 ## Registration and the parse entry
 
-`Feed` has no factory of its own: register it on a `jsonic` instance
+`Feed` has no factory of its own: register it on an engine instance
 with `UseDefaults`. Parsing is the instance's `Parse` method.
 
 ```go
-j := tabnasjsonic.Make()
+j := tabnas.Make()
 err := j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults, opts) // opts optional
 result, err := j.Parse(source)                        // (any, error)
 ```

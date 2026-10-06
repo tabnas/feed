@@ -1,7 +1,7 @@
 # feed (Go)
 
 A Go port of [`@tabnas/feed`](https://github.com/tabnas/feed), a
-[`jsonic`](https://github.com/tabnas/jsonic) plugin (built on
+[`tabnas`](https://github.com/tabnas/parser) plugin (built on
 [`xml`](https://github.com/tabnas/xml)) that parses syndication feeds
 (**RSS 0.90, 0.91, 0.92, 1.0, 2.0** and **Atom 0.3, 1.0**) into typed
 Go structs. By default every dialect is normalised to an Atom-shaped
@@ -24,12 +24,12 @@ package main
 import (
     "fmt"
 
-    tabnasjsonic "github.com/tabnas/jsonic/go"
     tabnasfeed "github.com/tabnas/feed/go"
+    tabnas "github.com/tabnas/parser/go"
 )
 
 func main() {
-    j := tabnasjsonic.Make()
+    j := tabnas.Make()
     if err := j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults); err != nil {
         panic(err)
     }

@@ -12,8 +12,8 @@ it differs from the TypeScript version) see [concepts](concepts.md).
 ## 1. Install
 
 `feed` is a plugin for the
-[`jsonic`](https://github.com/tabnas/jsonic) parser (which itself wraps
-the `tabnas` engine). Initialise a module and pull it in:
+[`tabnas`](https://github.com/tabnas/parser) engine (the one the `jsonic`
+parser wraps too). Initialise a module and pull it in:
 
 ```bash
 go mod init example
@@ -22,7 +22,7 @@ go get github.com/tabnas/feed/go
 
 ## 2. Parse a feed
 
-Register the plugin on a `jsonic` instance with `UseDefaults`, then
+Register the plugin on an engine instance with `UseDefaults`, then
 call `Parse`:
 
 ```go
@@ -31,12 +31,12 @@ package main
 import (
     "fmt"
 
-    tabnasjsonic "github.com/tabnas/jsonic/go"
     tabnasfeed "github.com/tabnas/feed/go"
+    tabnas "github.com/tabnas/parser/go"
 )
 
 func main() {
-    j := tabnasjsonic.Make()
+    j := tabnas.Make()
     if err := j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults); err != nil {
         panic(err)
     }
@@ -110,7 +110,7 @@ know not to trust it as plain text.
 ## 5. Handle an error
 
 If the root element is not a feed the plugin recognises, `Parse`
-returns a non-nil error (a `*tabnasjsonic.JsonicError`). Check it like any
+returns a non-nil error (a `*tabnas.TabnasError`). Check it like any
 other Go error:
 
 ```go

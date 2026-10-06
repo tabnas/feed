@@ -20,16 +20,19 @@ the parsed feed. This file covers only what is specific to this crate.
 | `tests/common/mod.rs` | the parsers, the value normaliser and the fixture runner the suites share |
 | `README.md` | the crate front page, doctested, and in the gated prose set |
 
-## Four crates by path
+## Crates by path
 
-`Cargo.toml` takes `tabnas` (`../../parser/rs`), `tabnas-jsonic`
-(`../../jsonic/rs`, which brings `tabnas-json`), `tabnas-xml`
+`Cargo.toml` takes `tabnas` (`../../parser/rs`) and `tabnas-xml`
 (`../../xml/rs`) and, as dev-dependencies, `tabnas-support`
-(`../../support/rs`, feature `serde_json`) and `tabnas-debug`
-(`../../debug/rs`). None is published. Clone them as siblings before
-running cargo, and expect `Cargo.lock` to move when one bumps its
-version: `../ci/rust/run.sh` exempts exactly those entries when it diffs
-the lock, and asserts everything else.
+(`../../support/rs`, feature `serde_json`), `tabnas-debug`
+(`../../debug/rs`) and `tabnas-jsonic` (`../../jsonic/rs`, which brings
+`tabnas-json`). `make`, `make_with` and `parse` build on the bare engine,
+`Tabnas::new()`, on the maintainer's ruling of 2026-10-06; jsonic is for
+the tests, which build their parsers as `tabnas_jsonic::make()` plus the
+plugin, as the canonical suites do (`common::parser_with`). Clone them
+as siblings before running cargo, and expect `Cargo.lock` to move when
+one bumps its version: `../ci/rust/run.sh` exempts exactly those entries
+when it diffs the lock, and asserts everything else.
 
 ## There is no grammar here
 

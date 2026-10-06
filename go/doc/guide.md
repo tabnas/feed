@@ -5,16 +5,16 @@ have the plugin installed (see the [tutorial](tutorial.md) for the
 basics). For full struct lists, options, and the mapping tables, follow
 the links into the [reference](reference.md).
 
-Every recipe starts from a `jsonic` instance with the `Feed` plugin
+Every recipe starts from an engine instance with the `Feed` plugin
 registered:
 
 ```go
 import (
-    tabnasjsonic "github.com/tabnas/jsonic/go"
     tabnasfeed "github.com/tabnas/feed/go"
+    tabnas "github.com/tabnas/parser/go"
 )
 
-j := tabnasjsonic.Make()
+j := tabnas.Make()
 j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults)
 ```
 
@@ -25,7 +25,7 @@ pulls in `github.com/tabnas/xml/go` for you, so you do not register the
 XML plugin yourself. Then `Parse` any feed source:
 
 ```go
-j := tabnasjsonic.Make()
+j := tabnas.Make()
 if err := j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults); err != nil {
     panic(err)
 }
@@ -47,7 +47,7 @@ fields like `TTL`, `Cloud`, or `SkipDays`, register with
 `format: "native"`:
 
 ```go
-j := tabnasjsonic.Make()
+j := tabnas.Make()
 j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults, map[string]any{"format": "native"})
 got, _ := j.Parse(rssSource)
 native := got.(tabnasfeed.Rss2Feed)
@@ -82,7 +82,7 @@ non-standard namespace extension like `<media:content>`) drop down to
 the raw element tree from the XML plugin with `format: "raw"`:
 
 ```go
-j := tabnasjsonic.Make()
+j := tabnas.Make()
 j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults, map[string]any{"format": "raw"})
 got, _ := j.Parse(`<rss version="2.0"><channel><title>x</title></channel></rss>`)
 tree := got.(map[string]any)
@@ -101,7 +101,7 @@ strings for text and nested element maps).
 with `format: "raw"`, then call it:
 
 ```go
-j := tabnasjsonic.Make()
+j := tabnas.Make()
 j.UseDefaults(tabnasfeed.Feed, tabnasfeed.Defaults, map[string]any{"format": "raw"})
 got, _ := j.Parse(`<rss version="2.0"><channel><title>x</title></channel></rss>`)
 
@@ -129,7 +129,7 @@ f := out.(tabnasfeed.AtomFeed)
 
 `Parse` returns a non-nil `error` for both XML-level failures
 (unterminated tag, mismatched close) and feed-level failures
-(unrecognised root). The concrete type is `*tabnasjsonic.JsonicError`, which
+(unrecognised root). The concrete type is `*tabnas.TabnasError`, which
 carries a `Code` and a formatted message with source context:
 
 ```go
@@ -137,7 +137,7 @@ import "errors"
 
 got, err := j.Parse(src)
 if err != nil {
-    var je *tabnasjsonic.JsonicError
+    var je *tabnas.TabnasError
     if errors.As(err, &je) {
         // je.Code, je.Error(): structured, with row/col and a snippet
         log.Printf("feed parse failed: %v", je)

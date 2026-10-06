@@ -54,9 +54,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Checked out into a NAMED directory. rs/Cargo.toml takes the
-      # engine as `path = "../../parser/rs"` (and the jsonic base, the
-      # JSON core it needs, the xml grammar, the fixture runner and the
-      # debug plugin the same way), which resolves relative to rs/, so
+      # engine as `path = "../../parser/rs"` (and the xml grammar, and for
+      # the tests jsonic, the JSON core it needs, the fixture runner and the
+      # debug plugin, the same way), which resolves relative to rs/, so
       # the siblings have to sit beside this checkout rather than inside
       # it. A bare `actions/checkout` into the workspace root leaves
       # nowhere for them to go.
