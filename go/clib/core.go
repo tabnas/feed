@@ -25,7 +25,7 @@ import (
 	"unicode/utf8"
 
 	plug "github.com/tabnas/feed/go"
-	host "github.com/tabnas/jsonic/go"
+	host "github.com/tabnas/parser/go"
 )
 
 const (
