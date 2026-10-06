@@ -2,7 +2,9 @@
   "$schema": "https://tabnas.dev/schema/plugin.schema.json",
   "name": "@tabnas/feed",
   "go": "github.com/tabnas/feed/go",
+  "rust": "tabnas-feed",
   "description": "RSS (0.90 to 2.0) and Atom (0.3, 1.0) feed parsing for the tabnas engine, normalized to an Atom shape.",
+  "base": "@tabnas/xml",
   "engine": "@tabnas/parser",
   "extensions": [
     ".rss",
