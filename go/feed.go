@@ -11,6 +11,7 @@ package tabnasfeed
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -282,8 +283,15 @@ const (
 // --- XmlElement helpers ---------------------------------------------------
 //
 // The xml plugin returns elements as map[string]any with keys:
-//   name, localName, prefix, namespace, attributes (map[string]string),
-//   children ([]any with strings or nested element maps).
+//   name, localName, prefix, namespace, attributes, children ([]any with
+//   strings or nested element maps).
+//
+// attributes takes two shapes, and every helper here reads both. Since the
+// xml release that follows 0.7.14 it is a *tabnas.OrderedMap of string
+// values in source order (DOCTYPE defaults after them), the order the
+// TypeScript and Rust ports keep. Up to 0.7.14 it was a plain
+// map[string]any, which keeps no order at all. map[string]string is
+// accepted as well, for a tree built by hand.
 
 func asElement(v any) (map[string]any, bool) {
 	el, ok := v.(map[string]any)
@@ -314,17 +322,62 @@ func namespace(el map[string]any) string {
 }
 
 func attribute(el map[string]any, name string) (string, bool) {
-	a, ok := el["attributes"].(map[string]any)
-	if !ok {
-		// xml plugin usually emits attributes as map[string]string
-		if as, ok2 := el["attributes"].(map[string]string); ok2 {
-			v, ok3 := as[name]
-			return v, ok3
+	switch a := el["attributes"].(type) {
+	case *tabnas.OrderedMap:
+		if a == nil {
+			return "", false
 		}
-		return "", false
+		v, ok := a.Vals[name].(string)
+		return v, ok
+	case map[string]any:
+		v, ok := a[name].(string)
+		return v, ok
+	case map[string]string:
+		v, ok := a[name]
+		return v, ok
 	}
-	v, ok := a[name].(string)
-	return v, ok
+	return "", false
+}
+
+// attr is one attribute of an element, as serializeElement writes it.
+type attr struct {
+	name, value string
+}
+
+// orderedAttributes lists an element's attributes in the order to write
+// them. An ordered map gives its own order, which is the source order
+// TypeScript's Object.entries gives. A plain map has none, and ranging
+// over it gives a different order on each run, so its attributes are
+// written sorted by name: the same output every time.
+func orderedAttributes(el map[string]any) []attr {
+	switch a := el["attributes"].(type) {
+	case *tabnas.OrderedMap:
+		if a == nil {
+			return nil
+		}
+		out := make([]attr, 0, len(a.Keys))
+		for _, k := range a.Keys {
+			s, _ := a.Vals[k].(string)
+			out = append(out, attr{k, s})
+		}
+		return out
+	case map[string]any:
+		out := make([]attr, 0, len(a))
+		for k, v := range a {
+			s, _ := v.(string)
+			out = append(out, attr{k, s})
+		}
+		sort.Slice(out, func(i, j int) bool { return out[i].name < out[j].name })
+		return out
+	case map[string]string:
+		out := make([]attr, 0, len(a))
+		for k, v := range a {
+			out = append(out, attr{k, v})
+		}
+		sort.Slice(out, func(i, j int) bool { return out[i].name < out[j].name })
+		return out
+	}
+	return nil
 }
 
 func children(el map[string]any) []any {
@@ -406,24 +459,12 @@ func serializeElement(el map[string]any) string {
 	var b strings.Builder
 	b.WriteByte('<')
 	b.WriteString(name)
-	switch attrs := el["attributes"].(type) {
-	case map[string]any:
-		for k, v := range attrs {
-			s, _ := v.(string)
-			b.WriteString(` `)
-			b.WriteString(k)
-			b.WriteString(`="`)
-			b.WriteString(escapeAttr(s))
-			b.WriteString(`"`)
-		}
-	case map[string]string:
-		for k, v := range attrs {
-			b.WriteString(` `)
-			b.WriteString(k)
-			b.WriteString(`="`)
-			b.WriteString(escapeAttr(v))
-			b.WriteString(`"`)
-		}
+	for _, a := range orderedAttributes(el) {
+		b.WriteString(` `)
+		b.WriteString(a.name)
+		b.WriteString(`="`)
+		b.WriteString(escapeAttr(a.value))
+		b.WriteString(`"`)
 	}
 	inner := innerXml(el)
 	if inner == "" {
