@@ -218,6 +218,34 @@ and Rust's `make` builds on it:
   in feedparser's `illformed/`, at a cost of zero well-formed documents.
   Callers who want the bare-XML behaviour pass `{ strictNamespaces: false }`.
   Keep the two runtimes' defaults in step — TS `withDefaults`, Go `Defaults`.
+- **Go reads an element's attributes in two shapes.** `github.com/tabnas/xml/go`
+  gives them as a plain `map[string]any` up to 0.7.14, and as a
+  `*tabnas.OrderedMap` in source order (DOCTYPE defaults after them) from
+  the release that follows it; `attribute()` and `orderedAttributes()` in
+  `go/feed.go` read both, and a hand-built `map[string]string` too.
+  `serializeElement`, which writes XHTML content back out, follows the
+  ordered map's `Keys`, which is the order TypeScript's `Object.entries`
+  and Rust's `IndexMap` give. A plain map has no order and ranging over
+  one starts at a random place, so it is written sorted by name: the same
+  text on every run, though not TypeScript's text when the source was not
+  sorted. Ranging over it unsorted is what made 7 of the 4,106 inputs
+  under `test/` change from run to run. `go/attributes_test.go` pins both
+  shapes on trees built by hand, so it holds whichever xml `go/go.mod`
+  names.
+  No fixture pins the order yet, and that is deliberate: CI runs the Go
+  tests in a workspace over the sibling clones, so they see xml's `main`,
+  while a `GOWORK=off` run sees the release `go/go.mod` names, and until
+  both give the ordered map one of the two would fail an order-pinning
+  row. When `go/go.mod` requires the xml release with ordered attributes,
+  add a `test/spec/atom.tsv` row whose XHTML content has attributes out
+  of alphabetical order (TypeScript and Rust already write them in source
+  order). Keep both shapes until `go/go.mod` can no longer select an xml
+  that gives a plain map. The reverse pairing breaks: feed's Go port up to
+  0.6.14 reads only the plain map, so it sees no attributes at all on an
+  xml that gives the ordered one (1,650 of the 4,106 inputs come out
+  different, links lose their `href`, `type="xhtml"` reads as text). A
+  module that takes that xml release must take a feed release with this
+  change alongside it.
 - **Xml `Plugin` type bridge.** `Xml` is still typed against jsonic's
   legacy `Plugin` signature, so `feed.ts` casts it
   (`tn.use(Xml as unknown as Plugin, { … })`). The two are runtime-compatible;
