@@ -64,10 +64,11 @@ jobs:
         with:
           path: feed
 
-      # Sibling main, not a release: the crates are unpublished, so this
-      # is the only resolution there is. It is also the one CI already
-      # uses for Go and TypeScript, so all three ports are measured
-      # against the same engine and the same xml grammar. That matters
+      # Sibling main, not a release: rs/Cargo.toml names these crates by
+      # path (they are on crates.io, but the committed manifest stays
+      # path-only), so this is the only resolution there is. It is also the
+      # one CI already uses for Go and TypeScript, so all three ports are
+      # measured against the same engine and the same xml grammar. That matters
       # more here than in most repos: test/spec/xml-layer.tsv pins
       # behaviour the PUBLISHED @tabnas/xml does not have yet (see
       # AGENTS.md, "Conformance").

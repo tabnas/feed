@@ -105,22 +105,22 @@ once, on the iteration that produced the element.
 The Go structs carry JSON tags chosen so that `json.Marshal(result)`
 produces the same shape the TypeScript parser produces with
 `JSON.stringify`. This is what makes the shared fixtures in
-[`../../test/spec/`](../../test/spec/) work for both languages: each
+[`../../test/spec/`](../../test/spec/) work for Go as for TypeScript: each
 test JSON-marshal-unmarshals the parser output and deep-compares it to
 the language-agnostic expected `*.atom.json` / `*.native.json`. The
 vendored well-formed corpus in
 [`../../test/feedparser-wellformed/`](../../test/feedparser-wellformed/)
 (BSD 2-Clause, from
 [kurtmckee/feedparser](https://github.com/kurtmckee/feedparser)) is run
-by both languages too, as is the full
+in all three runtimes, as is the full
 [rubys/feedvalidator](https://github.com/rubys/feedvalidator) conformance
 corpus, fetched at a pinned commit rather than committed, and asserted on
 both halves (`go/conformance_test.go`, the twin of
-`ts/test/feedvalidator.test.ts`).
+`ts/test/feedvalidator.test.ts` and `rs/tests/conformance_test.rs`).
 
 ## Differences from the TS version
 
-The two implementations are kept in lockstep by the shared fixtures, so
+The three implementations are kept in lockstep by the shared fixtures, so
 the *output JSON* is identical. The differences are in the language API
 shape and value representation, not behaviour.
 
@@ -160,7 +160,7 @@ exported. Both languages export a `VERSION` constant equal to the
 
 ### Known accepted differences
 
-There are no known behavioural differences in the parsed output: both
+There are no known behavioural differences in the parsed output: all three
 languages pass the same `test/spec/*.tsv` fixtures after a JSON round-trip.
 The only differences are idiomatic-Go surface choices listed above
 (pointers vs. optional fields, `(any, error)` vs. throw, `map[string]any`

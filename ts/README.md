@@ -50,7 +50,7 @@ Full docs follow the four [Diátaxis](https://diataxis.fr) quadrants:
   conversion loses, and how it rides on `@tabnas/xml`.
 
 The Go port lives in [`../go/`](../go/) with its own
-[docs](../go/doc/); the project [main README](../README.md) covers both
+[docs](../go/doc/); the project [main README](../README.md) covers all three
 languages.
 
 ## License

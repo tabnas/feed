@@ -61,7 +61,7 @@ Full docs follow the four [Diátaxis](https://diataxis.fr) quadrants:
 - [Concepts](doc/concepts.md). Why it defaults to Atom, what
   conversion loses, and the **differences from the TS version**.
 
-The project [main README](../README.md) covers both languages side by
+The project [main README](../README.md) covers all three languages side by
 side; the TypeScript implementation is in [`../ts/`](../ts/).
 
 ## Testing
@@ -80,8 +80,10 @@ demand. It never skips when the corpus is absent; it fails.
 Pass `-count=1`: all three of those live above the Go module root, so Go does
 not treat them as test inputs and would otherwise replay a cached pass.
 
-`go test` here resolves the sibling `@tabnas/xml` checkout via the repo-set
-`go.work`; `GOWORK=off go test` resolves the last published module instead.
+Where the `link.sh` script from `tabnas/admin` has written a `go.work` one
+level up, `go test` here resolves the sibling `@tabnas/xml` checkout through
+it; `GOWORK=off go test`, or a checkout with no `go.work`, resolves the
+published module instead.
 The two are not interchangeable; check with
 `go list -m github.com/tabnas/xml/go`.
 

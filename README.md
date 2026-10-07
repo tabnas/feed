@@ -25,11 +25,15 @@ npm install @tabnas/feed @tabnas/parser @tabnas/xml
 
 # Go
 go get github.com/tabnas/feed/go
+
+# Rust
+cargo add tabnas-feed tabnas-xml tabnas-parser
 ```
 
-The Rust crate is not published. It is consumed as a path dependency on
-a sibling checkout, together with the engine and the XML grammar;
-[`rs/README.md`](rs/README.md) has the three entries.
+The Rust crate is on crates.io as well, and one entry is not enough: the
+crate's examples also name the engine, which is published as
+`tabnas-parser`, and the XML grammar; [`rs/README.md`](rs/README.md) has
+the three entries. It is those three that the Rust line installs.
 
 ## One tiny example
 

@@ -10,8 +10,9 @@ package tabnasfeed_test
 //	pinned:   2a8050b950594464b3923af249623b614774c138
 //	fetch:    ./scripts/fetch-feedvalidator.sh
 //
-// This file is the Go half of ts/test/feedvalidator.test.ts; the two runtimes
-// classify and assert identically, so a divergence shows up as one going red.
+// This file is the Go twin of ts/test/feedvalidator.test.ts, and
+// rs/tests/conformance_test.rs is the Rust one; the three runtimes classify
+// and assert identically, so a divergence shows up as one going red.
 //
 // The corpus is NOT committed to this repo. It is fetched at a pinned commit
 // into a gitignored directory. When it is absent these tests FAIL LOUDLY —

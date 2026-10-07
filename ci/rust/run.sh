@@ -12,8 +12,9 @@
 # `tabnas-debug = { path = "../../debug/rs" }` and
 # `tabnas-jsonic = { path = "../../jsonic/rs" }`). jsonic in turn takes
 # `tabnas-json` from `../../json/rs`, so that checkout is needed too even
-# though this crate does not name it. None is published, so there is no
-# registry version to fall back on. Clone
+# though this crate does not name it. All are on crates.io, but the
+# committed manifest names them by path alone, so there is no registry
+# version to fall back on. Clone
 # https://github.com/tabnas/parser, https://github.com/tabnas/json,
 # https://github.com/tabnas/jsonic, https://github.com/tabnas/xml,
 # https://github.com/tabnas/support and https://github.com/tabnas/debug

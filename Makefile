@@ -1,8 +1,10 @@
 # Build, test and publish the TypeScript (ts/), Go (go/) and Rust (rs/)
 # implementations. ts/ is canonical; go/ and rs/ track it.
 #
-# Local build/test resolve the unpublished @tabnas siblings via the
-# repo-set go.work + node_modules symlinks (admin/scripts/link.sh).
+# TypeScript and Go build against the published @tabnas siblings (npm, the
+# Go proxy); admin/scripts/link.sh can point them at local checkouts instead
+# (node_modules symlinks + a go.work one level up). rs/ takes its tabnas
+# crates by path from sibling checkouts.
 
 .PHONY: all build test clean build-ts build-go build-rs test-ts test-go \
         test-rs clean-ts clean-go clean-rs publish-ts publish-go version-rs \
@@ -79,7 +81,8 @@ tags-go:
 #
 # The crate takes the engine, the xml grammar, and for its tests the
 # jsonic grammar, the fixture runner and the debug plugin as SIBLING
-# CHECKOUTS by path; none is published. ci/rust/run.sh is the full gate
+# CHECKOUTS by path; they are on crates.io, but the committed manifest
+# stays path-only. ci/rust/run.sh is the full gate
 # and checks for them first. These targets are the fast inner loop.
 build-rs:
 	cd rs && cargo build --all-targets

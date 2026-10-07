@@ -196,23 +196,23 @@ every shared fixture pins.
 
 ## Install
 
-The `tabnas` and `tabnas-xml` crates are consumed as **sibling
-checkouts**, the standard tabnas development model, so they are not
-fetched from a registry here: they are local clones. Clone
-`https://github.com/tabnas/parser` and `https://github.com/tabnas/xml`
-next to this repository and point at them:
+The engine and the XML grammar are not part of this crate, and the
+examples on this page name both. All three are on crates.io. The engine's
+package is named `tabnas-parser`, though in code it is `tabnas`:
 
-```toml
-[dependencies]
-tabnas-feed = { path = "../feed/rs" }
-tabnas-xml = { path = "../xml/rs" }
-tabnas = { package = "tabnas-parser", path = "../parser/rs" }
+```bash
+cargo add tabnas-feed tabnas-xml tabnas-parser
 ```
 
 All three entries are needed. A crate's dependencies are not passed on to
 its dependents, so `tabnas-feed` alone does not put the others in your
 extern prelude, and the examples above that name them would not resolve.
 Only `FeedError` is re-exported.
+
+In this repository, `Cargo.toml` takes the engine and `tabnas-xml` by path
+from sibling checkouts instead, as it does the test-only crates, and the
+release workflow swaps those paths for crates.io versions, and drops the
+test-only ones, when it publishes this crate.
 
 ## Untrusted input
 

@@ -94,14 +94,17 @@ exported for callers working with `raw` output.
 
 There is no `package.json` `bin` — this package has no CLI.
 
-## The tabnas dependencies (sibling checkout)
+## The tabnas dependencies
 
 Feed sits two layers up the tabnas stack: it depends on **xml**, which in
 turn depends on **parser**, the engine. No port depends on **jsonic** at
 run time (the maintainer's ruling of 2026-10-06 moved the Rust crate,
 and xml's TypeScript and Rust, off it); it is a development dependency
-in all three, for the test suites. The TypeScript and Go halves
-are published; the Rust crates are not, and resolve as sibling checkouts.
+in all three, for the test suites. Every one of them is published, to npm,
+the Go module proxy and crates.io. TypeScript and Go take the published
+versions; the Rust crate's committed manifest takes its siblings by path,
+so in this repository they resolve as sibling checkouts (the release
+workflow swaps in crates.io versions when it publishes `tabnas-feed`).
 Read the manifests rather than this list when the two disagree:
 
 - TypeScript `ts/package.json` `peerDependencies` are `@tabnas/parser`
@@ -136,9 +139,12 @@ Read the manifests rather than this list when the two disagree:
   C library does. `ci/rust/run.sh` checks for each checkout before it
   runs anything.
 
-Clone the transitive closure as siblings of this repo and build their TS
-first (`cd <dep>/ts && npm install && npm run build`), then work here. CI
-clones and builds them all in order (see below).
+TypeScript and Go need no sibling checkout. The Rust crate needs the path
+siblings above cloned beside this repo. To test against unreleased
+siblings, clone them, build their TS (`cd <dep>/ts && npm install && npm
+run build`) and link them as "Running the TypeScript half from a clean
+checkout" below describes. CI clones and builds them all in order (see
+below).
 
 All three test suites construct a parser as **jsonic + Feed**, as they
 always have. The bare engine, **parser + Feed**, gives the same results:
@@ -217,7 +223,8 @@ and Rust's `make` builds on it:
   worth exactly +6 must-reject documents in the feedvalidator corpus and +1
   in feedparser's `illformed/`, at a cost of zero well-formed documents.
   Callers who want the bare-XML behaviour pass `{ strictNamespaces: false }`.
-  Keep the two runtimes' defaults in step — TS `withDefaults`, Go `Defaults`.
+  Keep the three runtimes' defaults in step — TS `withDefaults`, Go
+  `Defaults`, Rust `FeedOptions::default()`.
 - **Go reads an element's attributes in two shapes.** `github.com/tabnas/xml/go`
   gives them as a plain `map[string]any` up to 0.7.14, and as a
   `*tabnas.OrderedMap` in source order (DOCTYPE defaults after them) from
@@ -293,16 +300,17 @@ editing a shared fixture replays a cached `ok ... (cached)` and the new rows
 never run — a green tick that proves nothing. The `test-go` Makefile target
 passes it.
 
-**`GOWORK=off` is not the same run.** `go test` from `go/` picks up the
-repo-set `go.work` and resolves `github.com/tabnas/xml/go` to the sibling
-checkout; `GOWORK=off go test` resolves the last *published* module. Confirm
+**`GOWORK=off` is not the same run.** Where admin's `scripts/link.sh` has
+written a `go.work` one level up, `go test` from `go/` picks it up and
+resolves `github.com/tabnas/xml/go` to the sibling checkout; `GOWORK=off go
+test`, or a run with no `go.work`, resolves the last *published* module. Confirm
 which you are in with `go list -m github.com/tabnas/xml/go` — a bare module
 path means sibling, a path with a version means published. An unpublished
 `xml` fix is invisible to the `GOWORK=off` run, so a green `GOWORK=off` suite
 proves nothing about it (and today an unpublished `xml` fix is exactly what
 the feedvalidator harness depends on — see "Conformance" below).
 
-Or via the top-level `Makefile` (ts canonical, go tracks it):
+Or via the top-level `Makefile` (ts canonical; go and rs track it):
 
 ```bash
 make fetch        # third-party corpora at their pinned SHAs (idempotent)
@@ -344,10 +352,14 @@ and the second is the one that is easy to miss:
    `ts` job's link step does, and it is local wiring: none of it may be
    committed.
 
-`ts/test/doc-examples.test.ts` does not go through `node_modules` at all — it
-resolves `@tabnas/*` by filesystem path from the repository's parent — so an
-unbuilt sibling fails it with `MODULE_NOT_FOUND` however the install went.
-Building the siblings is the fix, not reinstalling.
+`ts/test/doc-examples.test.ts` resolves a doc example's `require` through
+`node_modules` first, so it sees whatever steps 1 and 2 left there. Only a
+`@tabnas/*` package that is not installed falls back to the sibling
+checkout `../<x>/ts`, and `@tabnas/feed` itself resolves to this
+repository's `ts/`. The tested blocks need only `@tabnas/feed` and
+`@tabnas/parser`, so a sibling can fail them with `MODULE_NOT_FOUND` only
+where step 2 linked it unbuilt; building that sibling is the fix, not
+reinstalling.
 
 Whether a given `npm test` proved anything about the published packages or
 about your checkout depends entirely on which of the two states you are in.
@@ -451,12 +463,15 @@ The steps, in order:
    suite then passes against unreleased code while appearing to verify the
    published one. Reinstalling is the part that matters.
 
-   One thing a clean install does **not** isolate:
-   `ts/test/doc-examples.test.*` resolves `@tabnas/*` by filesystem path
-   (`const TABNAS = path.join(REPO, '..')`), not through `node_modules`. If
-   unbuilt sibling checkouts sit beside this repo, those blocks fail with
-   `MODULE_NOT_FOUND` no matter what you installed — build the siblings, or
-   verify somewhere they are absent.
+   A clean install covers the doc examples too.
+   `ts/test/doc-examples.test.*` resolves a doc example's `require` through
+   `node_modules` first; only a `@tabnas/*` package that is not installed
+   falls back to the sibling checkout `../<x>/ts`
+   (`const TABNAS = path.join(REPO, '..')`), and `@tabnas/feed` itself to
+   this repository's `ts/`. The tested blocks require only `@tabnas/feed`
+   and `@tabnas/parser`, which `ts/package.json` declares, so they run
+   against the registry copy, unless admin's `scripts/link.sh` has linked a
+   sibling over it, in which case that sibling has to be built.
 
    `npm test` already compiles here: `ts/package.json` sets `pretest` to
    `npm run build`, which npm runs automatically. No separate build step is
@@ -470,13 +485,17 @@ The steps, in order:
    ```bash
    (
      cd go
-     go mod edit -json | grep -q '"Replace": null' || { echo 'go.mod has a replace'; exit 1; }
+     go mod edit -json | jq -e '.Replace == null' >/dev/null || { echo 'go.mod has a replace'; exit 1; }
      GOWORK=off go test -count=1 ./...
    )
    ```
 
    `-count=1` because shared fixtures live outside the Go module, so a
-   changed corpus does not invalidate the test cache.
+   changed corpus does not invalidate the test cache. The check asks `jq`,
+   not `grep`: current Go leaves the `Replace` key out when there is no
+   replace, where older Go printed `"Replace": null`, and `jq` reads a
+   missing key as null, so the check passes on a clean `go.mod` and fails
+   on a replace either way.
 3. **Merge the bump through a reviewed PR.** That is the house convention —
    `CONTRIBUTING.md` squash-merges PRs and takes the title as the commit
    message — and what `release.yml`'s own header describes. A direct push to

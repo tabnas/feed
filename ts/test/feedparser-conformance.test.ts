@@ -9,7 +9,8 @@
 // `scripts/fetch-corpus.mjs` already fetched this corpus for the npm
 // `pretest` hook, but until now nothing read it: `test/feedparser/` was
 // downloaded on every run and then ignored. This file is the consumer, and
-// `go/conformance_test.go` is its twin, so the two runtimes cannot drift.
+// `go/conformance_test.go` and `rs/tests/conformance_test.rs` are its twins,
+// so the three runtimes cannot drift.
 //
 // Four checks, all of which must run:
 //
