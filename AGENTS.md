@@ -228,7 +228,7 @@ and Rust's `make` builds on it:
 - **Go reads an element's attributes in two shapes.** `github.com/tabnas/xml/go`
   gives them as a plain `map[string]any` up to 0.7.14, and as a
   `*tabnas.OrderedMap` in source order (DOCTYPE defaults after them) from
-  the release that follows it; `attribute()` and `orderedAttributes()` in
+  0.7.15; `attribute()` and `orderedAttributes()` in
   `go/feed.go` read both, and a hand-built `map[string]string` too.
   `serializeElement`, which writes XHTML content back out, follows the
   ordered map's `Keys`, which is the order TypeScript's `Object.entries`
@@ -239,20 +239,19 @@ and Rust's `make` builds on it:
   under `test/` change from run to run. `go/attributes_test.go` pins both
   shapes on trees built by hand, so it holds whichever xml `go/go.mod`
   names.
-  No fixture pins the order yet, and that is deliberate: CI runs the Go
-  tests in a workspace over the sibling clones, so they see xml's `main`,
-  while a `GOWORK=off` run sees the release `go/go.mod` names, and until
-  both give the ordered map one of the two would fail an order-pinning
-  row. When `go/go.mod` requires the xml release with ordered attributes,
-  add a `test/spec/atom.tsv` row whose XHTML content has attributes out
-  of alphabetical order (TypeScript and Rust already write them in source
-  order). Keep both shapes until `go/go.mod` can no longer select an xml
-  that gives a plain map. The reverse pairing breaks: feed's Go port up to
-  0.6.14 reads only the plain map, so it sees no attributes at all on an
-  xml that gives the ordered one (1,650 of the 4,106 inputs come out
-  different, links lose their `href`, `type="xhtml"` reads as text). A
-  module that takes that xml release must take a feed release with this
-  change alongside it.
+  A `test/spec/atom.tsv` row pins the order in all three runtimes: its
+  XHTML content writes `title` before `href` and `src` before `alt`. It
+  arrived with feed 0.6.15, the first release whose `go/go.mod` requires
+  xml 0.7.15; before that, CI's Go tests ran in a workspace over the
+  sibling clones and saw xml's `main` while a `GOWORK=off` run saw the
+  release `go/go.mod` named, and one of the two would have failed the row.
+  On 0.7.14 it fails Go with the sorted text. Keep both shapes until
+  `go/go.mod` can no longer select an xml that gives a plain map. The
+  reverse pairing breaks: feed's Go port up to 0.6.14 reads only the plain
+  map, so it sees no attributes at all on an xml that gives the ordered
+  one (1,650 of the 4,106 inputs come out different, links lose their
+  `href`, `type="xhtml"` reads as text). A module that takes that xml
+  release must take a feed release with this change alongside it.
 - **Xml `Plugin` type bridge.** `Xml` is still typed against jsonic's
   legacy `Plugin` signature, so `feed.ts` casts it
   (`tn.use(Xml as unknown as Plugin, { … })`). The two are runtime-compatible;
