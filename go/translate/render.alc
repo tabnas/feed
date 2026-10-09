@@ -1,0 +1,416 @@
+; Feeds' render: a feed tree's events written as one Atom 1.0 document.
+; This is a library of definitions, each named `feed-...`, which a host
+; links with its own program (alchemy's `compile_sources`); its entry
+; point is `feed-render`, and nothing else here is the host's to call.
+;
+; The tree is the one the reader builds by default, the Atom-shaped feed
+; it makes of an Atom 1.0 or 0.3 document and of an RSS 0.90 to 2.0 one,
+; or one the embedding (`alchemy/embed.alc`) made of a plain tree:
+;
+;   feed     format and version (read, not written), entries, id, title,
+;            subtitle, rights, updated, authors, contributors, categories,
+;            links, generator, icon, logo
+;   entry    id, title, updated, published, authors, contributors,
+;            categories, links, content, rights, summary, source
+;   source   the feed's members but entries
+;   person   name, uri, email (an author or a contributor)
+;   text     type and value (a title, subtitle, rights or summary)
+;   content  type, src and value
+;   generator  uri, version and value
+;   category term, scheme and label; link href, rel, type, hreflang,
+;            title and length
+;
+; Each member is written as the element Atom names for it, in the order
+; the tree holds them: a string as an element's text, a list as one
+; element for each item (`authors` as `author` elements, `entries` as
+; `entry` elements), a category and a link as an element whose members
+; are its attributes, and a text construct, a content and a generator as
+; an element whose `value` is its text and whose other members are its
+; attributes. The document begins with an XML declaration and the `feed`
+; element in Atom 1.0's namespace, so the reader reads it back as Atom
+; 1.0 whatever version the tree says; an element with no children is
+; written on one line, every other element's children one to a line, two
+; spaces deeper. A text construct or a content of type `xhtml` is written
+; as `html`, its markup as escaped text: the reader keeps an xhtml
+; value's markup as text, its own text unescaped, so writing it back as
+; markup could make a document that is not XML, and an Atom reader shows
+; escaped html as the same markup. Character data has `&`, `<` and `>`
+; written as `&amp;`, `&lt;` and `&gt;`, and an attribute's value, always
+; double-quoted, has `&`, `<` and `"` written as `&amp;`, `&lt;` and
+; `&quot;`; a carriage return in either, and a tab or a line feed in an
+; attribute, are written as `&#13;`, `&#9;` and `&#10;`, since a reader
+; normalises a bare one away. A number or a boolean where Atom has text
+; is written as its text (a link's `length` is a number), and a member
+; whose value is null is not written.
+;
+; The order is the tree's, so the entries of a tree the reader built,
+; which it puts before the feed's own members, are written first; Atom
+; gives the children of `feed` no order, and the reader takes any. An
+; entry's `source`, which the reader makes of an RSS item's source, is
+; written as Atom's `source` element, which the reader does not read.
+;
+; A tree that is not a feed fails with TARGET_VALUE_UNREPRESENTABLE,
+; naming what was met: a root that is not an object, a member a feed, an
+; entry, a source or one of their parts does not have, or a value of the
+; wrong kind. A character XML 1.0 cannot carry (a control below U+0020
+; but the tab, the line feed and the carriage return, U+FFFE or U+FFFF),
+; which the reader builds only from a character reference no well-formed
+; document holds, is written as U+FFFD, the replacement character.
+; Events no tree has fail with PROTOCOL_ORDER_ERROR.
+;
+; The state is a stack of markers, one for each container the render is
+; inside, each holding the indentation its elements are written at:
+;
+;   [:obj ctx inner outer el]       a feed, entry, source or person
+;                                   (`ctx`), its key or its end due;
+;                                   `inner` indents its children, `outer`
+;                                   it, and `el` is the element it closes
+;   [:due member in]                a member's value due; `member` says
+;                                   which element it is written as
+;   [:held kind el in value]        a text construct, a content or a
+;                                   generator (`kind`), its attributes
+;                                   written and its `value` held until
+;                                   it ends
+;   [:hdue kind el in value role name]  the same, a member's value due
+;   [:items kind el in]             a list of persons, entries,
+;                                   categories or links
+;   [:attrs el]                     a category or a link, its attributes
+;                                   written as they come
+;   [:adue el name]                 the same, an attribute's value due
+;
+; Nothing grows with a document's width or length. Once the feed element
+; is closed the state is `[:done]`, and nothing may follow it.
+
+; The characters XML 1.0 can carry, as code point ranges.
+def feed-xml-chars [[9 10] [13 13] [32 55295] [57344 65533] [65536 1114111]]
+
+def feed-fail [what]
+  fail :unrepresentable (string-join "" ["the tree is not a feed: " what])
+
+; A value's kind, in words.
+def feed-kind [value]
+  match (kind value)
+    case :null "null"
+    case :boolean "a boolean"
+    case :number "a number"
+    case :string "a string"
+    case _ "a container"
+
+; A string with every character XML 1.0 cannot carry written as U+FFFD,
+; the replacement character: the controls below U+0020 but the tab, the
+; line feed and the carriage return, and U+FFFE and U+FFFF. XML has no
+; spelling for one, not even a character reference, and the reader builds
+; one only from a document that is not well formed (`&#26;`).
+def feed-scrub [value]
+  replace-text "\u0000" "\ufffd"
+    replace-text "\u0001" "\ufffd"
+      replace-text "\u0002" "\ufffd"
+        replace-text "\u0003" "\ufffd"
+          replace-text "\u0004" "\ufffd"
+            replace-text "\u0005" "\ufffd"
+              replace-text "\u0006" "\ufffd"
+                replace-text "\u0007" "\ufffd"
+                  replace-text "\u0008" "\ufffd"
+                    replace-text "\u000b" "\ufffd"
+                      replace-text "\u000c" "\ufffd"
+                        replace-text "\u000e" "\ufffd"
+                          replace-text "\u000f" "\ufffd"
+                            replace-text "\u0010" "\ufffd"
+                              replace-text "\u0011" "\ufffd"
+                                replace-text "\u0012" "\ufffd"
+                                  replace-text "\u0013" "\ufffd"
+                                    replace-text "\u0014" "\ufffd"
+                                      replace-text "\u0015" "\ufffd"
+                                        replace-text "\u0016" "\ufffd"
+                                          replace-text "\u0017" "\ufffd"
+                                            replace-text "\u0018" "\ufffd"
+                                              replace-text "\u0019" "\ufffd"
+                                                replace-text "\u001a" "\ufffd"
+                                                  replace-text "\u001b" "\ufffd"
+                                                    replace-text "\u001c" "\ufffd"
+                                                      replace-text "\u001d" "\ufffd"
+                                                        replace-text "\u001e" "\ufffd"
+                                                          replace-text "\u001f" "\ufffd"
+                                                            replace-text "\ufffe" "\ufffd"
+                                                              replace-text "\uffff" "\ufffd" value
+
+; A scalar as text: a string, its characters XML 1.0 cannot carry as
+; U+FFFD; a number by its lexeme or as JSON writes it (`Infinity`,
+; `-Infinity` or `NaN` where it is not finite); a boolean by its name.
+def feed-text [value]
+  match (kind value)
+    case :string
+      if (chars-within feed-xml-chars value)
+        value
+        feed-scrub value
+    case :number
+      match (number-class value)
+        case :finite (scalar-text csv-options value)
+        case :infinity "Infinity"
+        case :negative-infinity "-Infinity"
+        case :nan "NaN"
+    case :boolean (scalar-text csv-options value)
+
+; Character data.
+def feed-chars [value]
+  replace-text "\r" "&#13;"
+    replace-text ">" "&gt;"
+      replace-text "<" "&lt;"
+        replace-text "&" "&amp;" (feed-text value)
+
+; An attribute's value, between double quotes.
+def feed-attr [value]
+  replace-text "\r" "&#13;"
+    replace-text "\n" "&#10;"
+      replace-text "\t" "&#9;"
+        replace-text "\"" "&quot;"
+          replace-text "<" "&lt;"
+            replace-text "&" "&amp;" (feed-text value)
+
+; What an object is, for the failures.
+def feed-where [ctx]
+  match ctx
+    case :feed "the feed"
+    case :entry "an entry"
+    case :source "an entry's source"
+    case :person "a person"
+
+; An item of a list, for the failures.
+def feed-item-name [el]
+  match el
+    case "entry" "an entry"
+    case "author" "an author"
+    case "contributor" "a contributor"
+    case "category" "a category"
+    case "link" "a link"
+
+; The members a feed, a source and an entry share.
+def feed-common-member [name]
+  match name
+    case "id" [:string "id"]
+    case "updated" [:string "updated"]
+    case "title" [:text "title"]
+    case "rights" [:text "rights"]
+    case "authors" [:list :person "author"]
+    case "contributors" [:list :person "contributor"]
+    case "categories" [:list :category "category"]
+    case "links" [:list :link "link"]
+    case _ :none
+
+; The members of a feed and of a source.
+def feed-head-member [name]
+  match name
+    case "format" [:skip name]
+    case "version" [:skip name]
+    case "subtitle" [:text "subtitle"]
+    case "generator" [:held :generator "generator"]
+    case "icon" [:string "icon"]
+    case "logo" [:string "logo"]
+    case _ (feed-common-member name)
+
+def feed-entry-member [name]
+  match name
+    case "published" [:string "published"]
+    case "summary" [:text "summary"]
+    case "content" [:held :content "content"]
+    case "source" [:source "source"]
+    case _ (feed-common-member name)
+
+def feed-person-member [name]
+  match name
+    case "name" [:string "name"]
+    case "uri" [:string "uri"]
+    case "email" [:string "email"]
+    case _ :none
+
+; What a member of an object is written as, or :none.
+def feed-member [ctx name]
+  match ctx
+    case :person (feed-person-member name)
+    case :entry (feed-entry-member name)
+    case :source (feed-head-member name)
+    case :feed
+      match name
+        case "entries" [:list :entry "entry"]
+        case _ (feed-head-member name)
+
+; A member's value, as the member asks for it, for the failures.
+def feed-wants [member]
+  match member
+    case [:string name] (string-join "" ["its " name " is text"])
+    case [:skip name] (string-join "" ["its " name " is text"])
+    case [:text name] (string-join "" ["its " name " is an object of type and value"])
+    case [:held _ name] (string-join "" ["its " name " is an object"])
+    case [:source _] "its source is an object"
+    case [:list _ el] (string-join "" ["its " el "s are a list"])
+
+; What a member of a text construct, a content or a generator is: its
+; `value`, held for the text; its `type`; another attribute; or :none.
+def feed-held-member [sort name]
+  match [sort name]
+    case [_ "value"] :value
+    case [:text "type"] :type
+    case [:content "type"] :type
+    case [:content "src"] :attribute
+    case [:generator "uri"] :attribute
+    case [:generator "version"] :attribute
+    case _ :none
+
+; The attributes of a category and of a link.
+def feed-attribute [el name]
+  match [el name]
+    case ["category" "term"] true
+    case ["category" "scheme"] true
+    case ["category" "label"] true
+    case ["link" "href"] true
+    case ["link" "rel"] true
+    case ["link" "type"] true
+    case ["link" "hreflang"] true
+    case ["link" "title"] true
+    case ["link" "length"] true
+    case _ false
+
+; A type as written: xhtml as html.
+def feed-type [value]
+  match value
+    case "xhtml" "html"
+    case _ value
+
+; The top marker, or :none before the root value.
+def feed-top [s]
+  match (count s)
+    case 0 :none
+    case _ (top s)
+
+def feed-mark [marker s]
+  push marker (pop s)
+
+def feed-deeper [in]
+  string-join "" [in "  "]
+
+; The root: the feed element.
+def feed-root [event]
+  match event
+    case object-start
+      transition [[:obj :feed "  " "" "feed"]] ["<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<feed xmlns=\"http://www.w3.org/2005/Atom\">\n"]
+    case array-start (feed-fail "its root is a list, where a feed is an object")
+    case (scalar value) (feed-fail (string-join "" ["its root is " (feed-kind value) ", where a feed is an object"]))
+    case _ (fail :protocol-order "the events begin with an end or a key, which a tree's never do")
+
+; A feed, an entry, a source or a person: a member, or its end.
+def feed-in-object [s ctx inner outer el event]
+  match event
+    case (key name)
+      match (feed-member ctx name)
+        case :none (feed-fail (string-join "" [(feed-where ctx) " has the member " (quoted name) ", which the reader's never has"]))
+        case member (transition (push [:due member inner] s) [])
+    case object-end
+      let [rest (pop s)]
+        match (count rest)
+          case 0 (transition [[:done]] [outer "</" el ">\n"])
+          case _ (transition rest [outer "</" el ">\n"])
+    case _ (fail :protocol-order "the events hold a value where a key is due, which a tree's never do")
+
+; A member's value.
+def feed-due [s member in event]
+  match event
+    case (scalar value)
+      match [(kind value) member]
+        case [:null _] (transition (pop s) [])
+        case [_ [:string name]] (transition (pop s) [in "<" name ">" (feed-chars value) "</" name ">\n"])
+        case [_ [:skip _]] (transition (pop s) [])
+        case _ (feed-fail (string-join "" [(feed-wants member) ", and it is " (feed-kind value)]))
+    case object-start
+      match member
+        case [:text name] (transition (feed-mark [:held :text name in :none] s) [in "<" name])
+        case [:held sort name] (transition (feed-mark [:held sort name in :none] s) [in "<" name])
+        case [:source name] (transition (feed-mark [:obj :source (feed-deeper in) in name] s) [in "<" name ">\n"])
+        case _ (feed-fail (string-join "" [(feed-wants member) ", and it is an object"]))
+    case array-start
+      match member
+        case [:list sort el] (transition (feed-mark [:items sort el in] s) [])
+        case _ (feed-fail (string-join "" [(feed-wants member) ", and it is a list"]))
+    case _ (fail :protocol-order "the events hold a key or an end where a value is due, which a tree's never do")
+
+; A text construct, a content or a generator: a member, or its end, which
+; writes its held value.
+def feed-in-held [s sort el in value event]
+  match event
+    case (key name)
+      match (feed-held-member sort name)
+        case :none (feed-fail (string-join "" ["its " el " has the member " (quoted name) ", which the reader's never has"]))
+        case role (transition (feed-mark [:hdue sort el in value role name] s) [])
+    case object-end
+      match value
+        case :none (transition (pop s) ["/>\n"])
+        case _ (transition (pop s) [">" (feed-chars value) "</" el ">\n"])
+    case _ (fail :protocol-order "the events hold a value where a key is due, which a tree's never do")
+
+def feed-held-due [s sort el in value role name event]
+  match event
+    case (scalar v)
+      match [role (kind v)]
+        case [:value :null] (transition (feed-mark [:held sort el in :none] s) [])
+        case [:value _] (transition (feed-mark [:held sort el in v] s) [])
+        case [_ :null] (transition (feed-mark [:held sort el in value] s) [])
+        case [:type _] (transition (feed-mark [:held sort el in value] s) [" type=\"" (feed-attr (feed-type v)) "\""])
+        case _ (transition (feed-mark [:held sort el in value] s) [" " name "=\"" (feed-attr v) "\""])
+    case object-start (feed-fail (string-join "" ["its " el "'s " name " is an object, where it is text"]))
+    case array-start (feed-fail (string-join "" ["its " el "'s " name " is a list, where it is text"]))
+    case _ (fail :protocol-order "the events hold a key or an end where a value is due, which a tree's never do")
+
+; A list: an object for each item, or its end.
+def feed-in-items [s sort el in event]
+  match event
+    case object-start
+      match sort
+        case :person (transition (push [:obj :person (feed-deeper in) in el] s) [in "<" el ">\n"])
+        case :entry (transition (push [:obj :entry (feed-deeper in) in el] s) [in "<" el ">\n"])
+        case _ (transition (push [:attrs el] s) [in "<" el])
+    case array-end (transition (pop s) [])
+    case array-start (feed-fail (string-join "" [(feed-item-name el) " is a list, where it is an object"]))
+    case (scalar v) (feed-fail (string-join "" [(feed-item-name el) " is " (feed-kind v) ", where it is an object"]))
+    case _ (fail :protocol-order "the events hold a key or an object's end inside a list, which a tree's never do")
+
+; A category or a link: an attribute, or its end.
+def feed-in-attrs [s el event]
+  match event
+    case (key name)
+      if (feed-attribute el name)
+        transition (feed-mark [:adue el name] s) []
+        feed-fail (string-join "" [(feed-item-name el) " has the member " (quoted name) ", which the reader's never has"])
+    case object-end (transition (pop s) ["/>\n"])
+    case _ (fail :protocol-order "the events hold a value where a key is due, which a tree's never do")
+
+def feed-attr-due [s el name event]
+  match event
+    case (scalar v)
+      match (kind v)
+        case :null (transition (feed-mark [:attrs el] s) [])
+        case _ (transition (feed-mark [:attrs el] s) [" " name "=\"" (feed-attr v) "\""])
+    case object-start (feed-fail (string-join "" [(feed-item-name el) "'s " name " is an object, where it is text"]))
+    case array-start (feed-fail (string-join "" [(feed-item-name el) "'s " name " is a list, where it is text"]))
+    case _ (fail :protocol-order "the events hold a key or an end where a value is due, which a tree's never do")
+
+def feed-step [s event]
+  match (feed-top s)
+    case :none (feed-root event)
+    case [:done] (fail :protocol-order "the events hold more after the root value, which a tree's never do")
+    case [:obj ctx inner outer el] (feed-in-object s ctx inner outer el event)
+    case [:due member in] (feed-due s member in event)
+    case [:held sort el in value] (feed-in-held s sort el in value event)
+    case [:hdue sort el in value role name] (feed-held-due s sort el in value role name event)
+    case [:items sort el in] (feed-in-items s sort el in event)
+    case [:attrs el] (feed-in-attrs s el event)
+    case [:adue el name] (feed-attr-due s el name event)
+
+def feed-finish [s]
+  match (feed-top s)
+    case [:done] []
+    case :none (fail :protocol-order "the events hold no value, where a tree's hold one")
+    case _ (fail :protocol-order "the events ended inside a container, which a tree's never do")
+
+; The render: a feed tree's events in, the Atom document's text out.
+def feed-render [input]
+  join ""
+    scan-emit [] feed-step feed-finish (events input)

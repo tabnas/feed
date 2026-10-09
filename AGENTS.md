@@ -85,6 +85,9 @@ exported for callers working with `raw` output.
 | [`ts/`](ts/) | **Canonical** TypeScript implementation — the `@tabnas/feed` package. Everything lives in `src/feed.ts` (plugin + types + helpers). No CLI. |
 | [`go/`](go/) | Go port — module `github.com/tabnas/feed/go`. Plugin + helpers in `go/feed.go`; top-level `const VERSION` mirrors `ts/package.json`. |
 | [`rs/`](rs/) | Rust port — crate `tabnas-feed`. Plugin + helpers in `rs/src/lib.rs`; `pub const VERSION` mirrors `ts/package.json`. See [`rs/AGENTS.md`](rs/AGENTS.md). |
+| [`alchemy/render.alc`](alchemy/render.alc) | **The feed's render**, an [alchemy](https://github.com/tabnas/alchemy) library whose entry point `feed-render` writes the events of a feed tree, the Atom-shaped tree the reader builds, as one Atom 1.0 document: each member as the element Atom names for it, in the tree's order, an xhtml text or content as escaped html, a null member not at all, and a character XML 1.0 cannot carry as U+FFFD. Every definition is named `feed-...`. The `translate` object in [`tabnas.plugin.json`](tabnas.plugin.json) names it, says the tree has the schema `feed` and an object at its root (`schema`, `root`), and lists what a written document does not keep (`loss`), RSS's channel and item fields the reader's mapping leaves out among them. |
+| [`alchemy/embed.alc`](alchemy/embed.alc) | **The feed's embedding**, beside the render: `feed-embed` takes any plain tree to a feed, an object's members, an array's elements or a scalar root as its entries, each titled by its value's own `title` or by its key or position, its content its value's compact JSON text, and its categories of the scheme `tag:tabnas.dev,2026:feed-embed` the value's events, exactly; `feed-unembed` reads such a feed back to the plain tree, a number through alchemy's `number`. The file's header states every rule and what the reverse refuses. |
+| [`ts/embed-translate.js`](ts/embed-translate.js) | Writes the manifest and both alchemy files into `ts/src/translate.ts` and copies them into `go/translate/` and `rs/translate/`, where `go:embed` and `include_str!` can reach them; `npm run embed` runs it, and so does `npm run build`, which embeds first. `translate()` hands the parts to a host in all three runtimes (`Translate()` in Go), and `ts/test/translate.test.ts`, `go/translate_test.go` and `rs/tests/translate_test.rs` fail until every copy is its file, so change a file at the root and run the embed; never edit a copy. The round trip that runs the parts needs alchemy, which this repository does not depend on, so it runs in the hosts' suites (aless, alchemy-cli). |
 | [`test/divergent.tsv`](test/divergent.tsv) | The divergence register: where a port disagrees, with a column per runtime, executed rather than described. Argued in [`DIVERGENCE.md`](DIVERGENCE.md). |
 | [`test/spec/`](test/spec/) | Shared `.tsv` conformance fixtures. All three runtimes auto-discover this dir; the header row's second column name selects what is compared (`expected` = the parse result, `detect` = the dialect report). See [`test/AGENTS.md`](test/AGENTS.md). |
 | [`test/feedparser-wellformed/`](test/feedparser-wellformed/) | Vendored well-formed feed corpus from kurtmckee/feedparser (BSD 2-Clause), in `atom10/` `atom/` `rss/` `rdf/` subdirs. All three runtimes parse these and assert detection. See `THIRD_PARTY_NOTICES.md`. |
@@ -266,7 +269,7 @@ and Rust's `make` builds on it:
 TypeScript (package in `ts/`):
 
 ```bash
-cd ts && npm install && npm run build   # tsc --build src test
+cd ts && npm install && npm run build   # npm run embed (the translation parts), then tsc --build src test
 cd ts && npm test                       # node --test over dist-test/*.test.js
 ```
 
