@@ -24,6 +24,16 @@ fn debug_parser() -> tabnas::Tabnas {
     parser
 }
 
+/// The same engine with the xml plugin alone, and the debug plugin.
+fn xml_debug_parser() -> tabnas::Tabnas {
+    let mut parser = tabnas_jsonic::make();
+    parser
+        .use_plugin(tabnas_xml::plugin(), None)
+        .expect("the xml plugin installs");
+    tabnas_debug::apply(&mut parser, DebugOptions::quiet()).expect("the debug plugin installs");
+    parser
+}
+
 #[test]
 fn the_parser_still_works_with_the_debug_plugin_installed() {
     let value = debug_parser()
@@ -39,13 +49,28 @@ fn the_model_reports_the_xml_grammar_and_nothing_feed_named() {
     let parser = debug_parser();
     let described = model(&parser);
 
-    let mut names: Vec<&str> = described
-        .rules
-        .iter()
-        .map(|rule| rule.name.as_str())
-        .collect();
-    names.sort_unstable();
-    assert_eq!(names, ["child", "content", "element", "xml"]);
+    // Exactly the rules the xml grammar has, compared with the model of
+    // a parser carrying the xml plugin alone rather than with a copy of
+    // its list, which a change to the xml grammar's rules would leave
+    // stale.
+    let names = |described: &tabnas_debug::DebugModel| {
+        let mut names: Vec<String> = described
+            .rules
+            .iter()
+            .map(|rule| rule.name.clone())
+            .collect();
+        names.sort_unstable();
+        names
+    };
+    let xml_parser = xml_debug_parser();
+    let xml = names(&model(&xml_parser));
+    for rule in ["xml", "element", "child"] {
+        assert!(
+            xml.iter().any(|name| name == rule),
+            "xml has no {rule:?} rule: {xml:?}"
+        );
+    }
+    assert_eq!(names(&described), xml);
 
     assert_eq!(described.config.start, "xml");
 
@@ -63,8 +88,7 @@ fn the_model_reports_the_xml_grammar_and_nothing_feed_named() {
     }
 
     // Structural facts of the xml grammar: the start rule opens an
-    // element, and elements recurse into elements through content and
-    // child.
+    // element, and elements recurse into elements through a child.
     let edges = |name: &str| {
         described
             .graph

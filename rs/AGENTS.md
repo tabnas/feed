@@ -42,9 +42,15 @@ The plugin contributes NO rules. It installs `tabnas_xml` with
 `strict_namespaces` from its own options and then adds one before-close
 callback to the existing `xml` rule, which is where the conversion runs.
 `tests/debug_model_test.rs` holds that to the structured grammar model:
-the rule set is the xml crate's `child`, `content`, `element`, `xml`, the
-start rule is `xml`, and the plugin list names both plugins. Adding a
-rule here would be a change of design, not a refactor.
+the rule set is exactly the xml crate's, compared with the model of a
+parser carrying the xml plugin alone, the start rule is `xml`, and the
+plugin list names both plugins; `tests/feed_test.rs` compares
+`rule_names` with `tabnas_xml::make()`'s the same way. The comparison is
+with xml's rules, not a copied list, so a change to the xml grammar's
+rules (such as the `head` and `children` rules with which it builds each
+element in document order) leaves these tests as they are, while a rule
+added here fails them. Adding a rule here would be a change of design,
+not a refactor.
 
 ## The before-close guard is what makes it run once
 
