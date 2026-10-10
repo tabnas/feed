@@ -12,7 +12,13 @@
 ;   kind of the root value (`object`, `array` or `value`), its `updated`
 ;   `1970-01-01T00:00:00Z`, since a plain tree has no time, and it has one
 ;   category, whose scheme is the marker `tag:tabnas.dev,2026:feed-embed`
-;   and whose term is that kind again.
+;   and whose term is that kind again. The feed's other members, its
+;   subtitle, rights, authors, contributors, links, generator, icon and
+;   logo, which a plain tree has nothing for, are null, and come before
+;   its entries with the rest: the render writes a null member as
+;   nothing, and with every member a feed can have before the entries it
+;   writes each entry as it comes rather than holding them all until the
+;   feed ends.
 ; - An object's members, in order, are the feed's entries; so are an
 ;   array's elements; and a scalar root is the one entry of the feed.
 ; - An entry's `id` is the marker, a slash and the entry's position from
@@ -164,13 +170,19 @@ def feed-embed-event-cat [v event]
         case :boolean (feed-embed-cat v (scalar-text csv-options value) :none)
         case :null (feed-embed-cat v "null" :none)
 
+; The members of a feed a plain tree has nothing for, each null,
+; appended to the events in v.
+def feed-embed-nulls [v]
+  push (scalar null) (push (key "logo") (push (scalar null) (push (key "icon") (push (scalar null) (push (key "generator") (push (scalar null) (push (key "links") (push (scalar null) (push (key "contributors") (push (scalar null) (push (key "authors") (push (scalar null) (push (key "rights") (push (scalar null) (push (key "subtitle") v)))))))))))))))
+
 ; The feed's head, up to the start of its entries.
 def feed-embed-head [word]
   let [v (feed-embed-text [object-start (key "format") (scalar "atom") (key "version") (scalar "1.0") (key "id") (scalar feed-embed-marker) (key "title")] word)]
     push array-start
       push (key "entries")
-        push array-end
-          feed-embed-cat (push array-start (push (key "categories") (push (scalar feed-embed-updated) (push (key "updated") v)))) word :none
+        feed-embed-nulls
+          push array-end
+            feed-embed-cat (push array-start (push (key "categories") (push (scalar feed-embed-updated) (push (key "updated") v)))) word :none
 
 ; An entry begins: its id and its part's category, in its categories.
 def feed-embed-entry-head [v pos role]
