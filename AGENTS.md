@@ -195,10 +195,12 @@ and Rust's `make` builds on it:
 ## Feed-specific gotchas
 
 - **No new grammar rules.** The plugin adds zero rules; it hooks the
-  `xml` rule's before-close. So `debug.model()` reports the **xml**
-  grammar's rule set — `['child', 'content', 'element', 'xml']` — and
-  `m.config.start === 'xml'`, not anything feed-named. The
-  `debug-model.test.ts` assertions encode exactly this, plus that
+  `xml` rule's before-close. So `debug.model()` reports exactly the
+  **xml** grammar's rule set and `m.config.start === 'xml'`, not anything
+  feed-named. The `debug-model.test.ts` assertions encode exactly this,
+  comparing the rules with those of a parser carrying the xml plugin
+  alone (as `rs/tests/debug_model_test.rs` and `feed_test.rs` do), so a
+  change to xml's rules does not leave a copied list behind, plus that
   `m.plugins` lists both `Feed` and `Xml`.
 - **The bc guard is load-bearing.** `xml`'s before-close fires more than
   once (the `xml` rule recurses to consume trailing whitespace). The hook

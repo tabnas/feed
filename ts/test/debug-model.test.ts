@@ -13,6 +13,7 @@ import assert from 'node:assert'
 
 import { Tabnas } from '@tabnas/parser'
 import { jsonic } from '@tabnas/jsonic'
+import { Xml } from '@tabnas/xml'
 import { Feed } from '../dist/feed.js'
 
 // This package compiles to CommonJS (see tsconfig module=nodenext, no
@@ -60,13 +61,19 @@ describe('compose: feed + @tabnas/debug', () => {
     tn.use(Debug, { print: false, trace: false })
     const m: any = tn.debug.model()
 
-    // The structured rule set: feed is built on @tabnas/xml, whose grammar
-    // is the xml / element / content / child rules. The feed plugin only
+    // The structured rule set: feed is built on @tabnas/xml, and only
     // hooks the existing `xml` rule's bc, so it adds no rules of its own.
-    assert.deepStrictEqual(
-      m.rules.map((r: any) => r.name).sort(),
-      ['child', 'content', 'element', 'xml'],
-    )
+    // The rules are exactly the xml grammar's, compared with the model of
+    // a parser carrying the xml plugin alone rather than with a copy of
+    // its list, which a change to the xml grammar's rules would leave
+    // stale.
+    const xmlOnly = new Tabnas().use(jsonic).use(Xml)
+    xmlOnly.use(Debug, { print: false, trace: false })
+    const xmlRules = xmlOnly.debug.model().rules.map((r: any) => r.name).sort()
+    for (const rule of ['xml', 'element', 'child']) {
+      assert.ok(xmlRules.includes(rule), `xml should have a ${rule} rule`)
+    }
+    assert.deepStrictEqual(m.rules.map((r: any) => r.name).sort(), xmlRules)
 
     // Entry rule.
     assert.equal(m.config.start, 'xml')
@@ -82,7 +89,7 @@ describe('compose: feed + @tabnas/debug', () => {
     )
 
     // Structural facts of the xml grammar: the start rule opens an element,
-    // and elements recurse into other elements via content -> child.
+    // and elements recurse into other elements through a child.
     const xml = m.rules.find((r: any) => r.name === 'xml')
     assert.ok(
       xml.open.some((a: any) => a.push === 'element'),

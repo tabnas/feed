@@ -138,9 +138,15 @@ fn installing_the_plugin_twice_is_a_no_op() {
 
 #[test]
 fn the_plugin_contributes_no_rules_of_its_own() {
+    // Exactly the xml grammar's rules, compared with a parser carrying the
+    // xml plugin alone rather than with a copy of its list, which a change
+    // to the xml grammar's rules would leave stale.
     let mut names = tabnas_feed::make().rule_names();
     names.sort();
-    assert_eq!(names, ["child", "content", "element", "xml"]);
+    let mut xml = tabnas_xml::make().rule_names();
+    xml.sort();
+    assert!(xml.iter().any(|name| name == "xml"), "{xml:?}");
+    assert_eq!(names, xml);
 }
 
 #[test]
