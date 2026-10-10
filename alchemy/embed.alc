@@ -1,0 +1,646 @@
+; Feeds' embedding: any plain tree as a feed, the tree the reader builds
+; and the render writes, and back again. This is a library of
+; definitions, each named `feed-...`, which a host links with its own
+; program and with the render (alchemy's `compile_sources`). It has two
+; entry points: `feed-embed` takes a plain tree's events to a feed's, and
+; `feed-unembed`, its reverse, takes the events of a feed the reader read
+; back to the plain tree's. Nothing else here is the host's to call.
+;
+; The embedding:
+;
+; - The feed's `id` is `tag:tabnas.dev,2026:feed-embed`, its `title` the
+;   kind of the root value (`object`, `array` or `value`), its `updated`
+;   `1970-01-01T00:00:00Z`, since a plain tree has no time, and it has one
+;   category, whose scheme is the marker `tag:tabnas.dev,2026:feed-embed`
+;   and whose term is that kind again. The feed's other members, its
+;   subtitle, rights, authors, contributors, links, generator, icon and
+;   logo, which a plain tree has nothing for, are null, and come before
+;   its entries with the rest: the render writes a null member as
+;   nothing, and with every member a feed can have before the entries it
+;   writes each entry as it comes rather than holding them all until the
+;   feed ends.
+; - An object's members, in order, are the feed's entries; so are an
+;   array's elements; and a scalar root is the one entry of the feed.
+; - An entry's `id` is the marker, a slash and the entry's position from
+;   0. Its `title` is its value's own `title` member, where its value is
+;   an object with a string there; otherwise its key, its position, or
+;   `value` for a scalar root. Its `updated` is the feed's, and its
+;   `content` is text: its value's compact JSON text, keys and strings
+;   through `quoted`, numbers by their lexeme, `null` for a number that
+;   is not finite.
+; - An entry's categories, each with the marker for its scheme, hold its
+;   value exactly, for the reverse: the first says which part of the root
+;   the entry is (term `member`, its label the key's quoted form;
+;   `element`; or `value`), and then one category stands for each of the
+;   value's events, in order: `object` and `array` for a container's
+;   start, `end` for its end, `key` with the key's quoted form as its
+;   label, `string` with the string's quoted form, `number` with the
+;   number's text (`Infinity`, `-Infinity` or `NaN` where it is not
+;   finite), and `true`, `false` and `null`. The content is for a reader
+;   of the feed; alchemy cannot read JSON text back, so the categories
+;   are what the reverse reads.
+;
+; Every string the embedding writes is one XML can carry, since a key or
+; a string goes into a label and the content in its quoted form; a title
+; holding a character XML cannot carry is written by the render's
+; convention, and only the reverse's own categories need to come back
+; exactly.
+;
+; The reverse reads a feed the reader built from what the render wrote:
+; the root's kind from the first entry's first category (or, with no
+; entry, from the feed's category), then each entry's categories, which
+; it turns back into the value's events. It reads an entry's categories
+; with the marker and nothing else of an entry or of the feed, so a
+; title, the content, a link or a category of another scheme does not
+; matter, and the members of a category may come in any order. A number
+; comes back through `number`, a key and a string through `unquoted`. A
+; feed that is not an embedding fails with TARGET_VALUE_UNREPRESENTABLE,
+; naming what was met: a root that is not an object, a feed with no
+; category of the marker, an entry with no category of the marker or with
+; an incomplete value, a first category that is not a part's, entries
+; that mix an object's members and an array's elements, and categories
+; whose events no tree has. A stream that is not a tree's fails with
+; PROTOCOL_ORDER_ERROR, in both directions.
+;
+; Each direction's state is a stack with one marker for each open
+; container, so it grows with a document's nesting and never with its
+; width or length, beside what one entry holds. The embedding keeps
+; `[:root kind position item]` for the root object or array, `kind` its
+; kind, `position` the next entry's as a vector of decimal digits
+; (alchemy has no arithmetic), and `item` the entry being written:
+; `:none` between entries, `[:key name]` once a member's key is read,
+; and `[:item role open text title pending]` while its value is, `open`
+; one marker for each of the value's open containers, `text` the value's
+; JSON text so far, which an entry holds whole, `title` its `title`
+; member where it has a string there, and `pending` whether that
+; member's value is due. Once the root value is written the state is
+; `[:done]`. The reverse keeps `[:feed root marker]` for the feed, `root`
+; what it has written of the root value and `marker` the kind the feed's
+; category gave; `[:entries]`, `[:entry phase open]` with the value's
+; open containers, `[:cats]` and `[:cat term scheme label]` for the
+; parts it reads; and `[:skip open]` for a member it does not read.
+
+; ---------------------------------------------------------------------
+; The embedding
+; ---------------------------------------------------------------------
+
+def feed-embed-marker "tag:tabnas.dev,2026:feed-embed"
+def feed-embed-updated "1970-01-01T00:00:00Z"
+
+def feed-embed-top [s]
+  match (count s)
+    case 0 :none
+    case _ (top s)
+
+def feed-embed-mark [marker s]
+  push marker (pop s)
+
+; The next decimal digit, and the successor of a vector of them, most
+; significant first.
+def feed-embed-digit [d]
+  match d
+    case "0" "1"
+    case "1" "2"
+    case "2" "3"
+    case "3" "4"
+    case "4" "5"
+    case "5" "6"
+    case "6" "7"
+    case "7" "8"
+    case "8" "9"
+    case "9" "0"
+
+def feed-embed-next [ds]
+  let [low (filter (fn [i] (match (get-path (path i) ds) (case "9" false) (case _ true))) (indices ds))]
+    match (count low)
+      case 0 (map (fn [i] (match i (case 0 "1") (case _ "0"))) (indices (push "0" ds)))
+      case _
+        let [p (top low)]
+          map
+            fn [i]
+              match (compare i p)
+                case :less (get-path (path i) ds)
+                case :equal (feed-embed-digit (get-path (path i) ds))
+                case _ "0"
+            indices ds
+
+; A number's text for a category: its lexeme, or as JSON writes it, or
+; the word for one that is not finite, which `number` reads back.
+def feed-embed-number [value]
+  match (number-class value)
+    case :finite (scalar-text csv-options value)
+    case :infinity "Infinity"
+    case :negative-infinity "-Infinity"
+    case :nan "NaN"
+
+; A scalar's compact JSON text, for the content.
+def feed-embed-json-scalar [value]
+  match (kind value)
+    case :string (quoted value)
+    case :number
+      match (number-class value)
+        case :finite (scalar-text csv-options value)
+        case _ "null"
+    case :boolean (scalar-text csv-options value)
+    case :null "null"
+
+; A category of the marker appended to the events in v.
+def feed-embed-cat [v term label]
+  let [head (push (scalar feed-embed-marker) (push (key "scheme") (push (scalar term) (push (key "term") (push object-start v)))))]
+    match label
+      case :none (push object-end head)
+      case _ (push object-end (push (scalar label) (push (key "label") head)))
+
+; A text construct's events appended.
+def feed-embed-text [v value]
+  push object-end (push (scalar value) (push (key "value") (push (scalar "text") (push (key "type") (push object-start v)))))
+
+; The category that stands for one of the value's events.
+def feed-embed-event-cat [v event]
+  match event
+    case object-start (feed-embed-cat v "object" :none)
+    case array-start (feed-embed-cat v "array" :none)
+    case object-end (feed-embed-cat v "end" :none)
+    case array-end (feed-embed-cat v "end" :none)
+    case (key name) (feed-embed-cat v "key" (quoted name))
+    case (scalar value)
+      match (kind value)
+        case :string (feed-embed-cat v "string" (quoted value))
+        case :number (feed-embed-cat v "number" (feed-embed-number value))
+        case :boolean (feed-embed-cat v (scalar-text csv-options value) :none)
+        case :null (feed-embed-cat v "null" :none)
+
+; The members of a feed a plain tree has nothing for, each null,
+; appended to the events in v.
+def feed-embed-nulls [v]
+  push (scalar null) (push (key "logo") (push (scalar null) (push (key "icon") (push (scalar null) (push (key "generator") (push (scalar null) (push (key "links") (push (scalar null) (push (key "contributors") (push (scalar null) (push (key "authors") (push (scalar null) (push (key "rights") (push (scalar null) (push (key "subtitle") v)))))))))))))))
+
+; The feed's head, up to the start of its entries.
+def feed-embed-head [word]
+  let [v (feed-embed-text [object-start (key "format") (scalar "atom") (key "version") (scalar "1.0") (key "id") (scalar feed-embed-marker) (key "title")] word)]
+    push array-start
+      push (key "entries")
+        feed-embed-nulls
+          push array-end
+            feed-embed-cat (push array-start (push (key "categories") (push (scalar feed-embed-updated) (push (key "updated") v)))) word :none
+
+; An entry begins: its id and its part's category, in its categories.
+def feed-embed-entry-head [v pos role]
+  let [id (string-join "" [feed-embed-marker "/" (string-join "" pos)])]
+    let [head (push array-start (push (key "categories") (push (scalar id) (push (key "id") (push object-start v)))))]
+      match role
+        case [:member name] (feed-embed-cat head "member" (quoted name))
+        case :element (feed-embed-cat head "element" :none)
+        case :value (feed-embed-cat head "value" :none)
+
+; An entry ends: its categories, then its title, updated and content.
+def feed-embed-entry-tail [v title text]
+  push object-end
+    feed-embed-text
+      push (key "content")
+        push (scalar feed-embed-updated)
+          push (key "updated")
+            feed-embed-text (push (key "title") (push array-end v)) title
+      text
+
+; An entry's title: its value's own, or its key, its position, or
+; `value`.
+def feed-embed-title [title role pos]
+  match [title role]
+    case [:none [:member name]] name
+    case [:none :element] (string-join "" pos)
+    case [:none :value] "value"
+    case _ title
+
+; The value's open containers after an event, or :bad for an event no
+; tree has there: `:obj-start` and `:obj-key` are an object whose next
+; key or end is due, before and after its first member, `:obj-value` one
+; whose member's value is due, and `:arr-start` and `:arr` an array,
+; before and after its first element.
+def feed-embed-open-next [open event]
+  match [(feed-embed-top open) event]
+    case [:obj-start (key _)] (feed-embed-mark :obj-value open)
+    case [:obj-key (key _)] (feed-embed-mark :obj-value open)
+    case [_ (key _)] :bad
+    case [:obj-start object-end] (pop open)
+    case [:obj-key object-end] (pop open)
+    case [_ object-end] :bad
+    case [:arr-start array-end] (pop open)
+    case [:arr array-end] (pop open)
+    case [_ array-end] :bad
+    case [:obj-start _] :bad
+    case [:obj-key _] :bad
+    case [t _] (feed-embed-open-value (feed-embed-placed open t) event)
+
+; A value placed at the top: an object's member has had its value, an
+; array has had an element.
+def feed-embed-placed [open t]
+  match t
+    case :obj-value (feed-embed-mark :obj-key open)
+    case :arr-start (feed-embed-mark :arr open)
+    case _ open
+
+def feed-embed-open-value [open event]
+  match event
+    case object-start (push :obj-start open)
+    case array-start (push :arr-start open)
+    case _ open
+
+; An event's piece of the JSON text, with the comma that leads a member
+; or an element after the first.
+def feed-embed-piece [open event]
+  match [(feed-embed-top open) event]
+    case [:obj-key (key name)] (string-join "" ["," (quoted name) ":"])
+    case [_ (key name)] (string-join "" [(quoted name) ":"])
+    case [_ object-end] "}"
+    case [_ array-end] "]"
+    case [:arr object-start] ",{"
+    case [:arr array-start] ",["
+    case [:arr (scalar value)] (string-join "" ["," (feed-embed-json-scalar value)])
+    case [_ object-start] "{"
+    case [_ array-start] "["
+    case [_ (scalar value)] (feed-embed-json-scalar value)
+
+; Whether the value's `title` member is due: a key `title` at the value's
+; own depth.
+def feed-embed-pending [open event]
+  match [(count open) event]
+    case [1 (key "title")] true
+    case _ false
+
+; The value's `title` member, where it is a string.
+def feed-embed-title-of [title pending open event]
+  match [pending (count open) event]
+    case [true 1 (scalar value)]
+      match (kind value)
+        case :string value
+        case _ title
+    case _ title
+
+; One of the value's events: its category, appended to the events in
+; `base`, and its piece of the JSON text; the entry ends with the value,
+; and the next entry's position is due.
+def feed-embed-item [rk pos item base event]
+  match item
+    case [:item role open text title pending]
+      match (feed-embed-open-next open event)
+        case :bad (fail :protocol-order "the events hold a key, a value or an end where a tree's never do")
+        case open2
+          let [text2 (string-join "" [text (feed-embed-piece open event)])]
+            let [title2 (feed-embed-title-of title pending open event)]
+              let [out (feed-embed-event-cat base event)]
+                match (count open2)
+                  case 0
+                    transition [[:root rk (feed-embed-next pos) :none]]
+                      feed-embed-entry-tail out (feed-embed-title title2 role pos) text2
+                  case _
+                    transition [[:root rk pos [:item role open2 text2 title2 (feed-embed-pending open2 event)]]] out
+
+; A value begins an entry: the entry's head, then the value's first
+; event.
+def feed-embed-begin [rk pos role base event]
+  feed-embed-item rk pos [:item role [] "" :none false] (feed-embed-entry-head base pos role) event
+
+; The root: an object's or an array's entries follow, and a scalar is
+; the feed's one entry.
+def feed-embed-root [event]
+  match event
+    case object-start (transition [[:root :object ["0"] :none]] (feed-embed-head "object"))
+    case array-start (transition [[:root :array ["0"] :none]] (feed-embed-head "array"))
+    case (scalar value)
+      match (feed-embed-begin :value ["0"] :value (feed-embed-head "value") event)
+        case (transition _ out) (transition [[:done]] (push object-end (push array-end out)))
+    case _ (fail :protocol-order "the events begin with an end or a key, which a tree's never do")
+
+; Between entries: an object's next key or an array's next element, or
+; the root's end, which ends the feed.
+def feed-embed-between [rk pos event]
+  match [rk event]
+    case [:object (key name)] (transition [[:root rk pos [:key name]]] [])
+    case [:object object-end] (transition [[:done]] [array-end object-end])
+    case [:array array-end] (transition [[:done]] [array-end object-end])
+    case [:array (key _)] (fail :protocol-order "the events hold a key inside an array, which a tree's never do")
+    case [:array object-end] (fail :protocol-order "the events end an object inside an array, which a tree's never do")
+    case [:array _] (feed-embed-begin rk pos :element [] event)
+    case [:object array-end] (fail :protocol-order "the events end an array inside an object, which a tree's never do")
+    case _ (fail :protocol-order "the events hold a value where a key is due, which a tree's never do")
+
+def feed-embed-step [s event]
+  match (feed-embed-top s)
+    case :none (feed-embed-root event)
+    case [:done] (fail :protocol-order "the events hold more after the root value, which a tree's never do")
+    case [:root rk pos :none] (feed-embed-between rk pos event)
+    case [:root rk pos [:key name]]
+      match event
+        case (key _) (fail :protocol-order "the events hold a key where a value is due, which a tree's never do")
+        case object-end (fail :protocol-order "the events end an object after a key and before its value, which a tree's never do")
+        case array-end (fail :protocol-order "the events end an array inside an object, which a tree's never do")
+        case _ (feed-embed-begin rk pos [:member name] [] event)
+    case [:root rk pos item] (feed-embed-item rk pos item [] event)
+
+def feed-embed-finish [s]
+  match (feed-embed-top s)
+    case [:done] []
+    case :none (fail :protocol-order "the events hold no value, where a tree's hold one")
+    case _ (fail :protocol-order "the events ended inside a container, which a tree's never do")
+
+; The embedding: a plain tree's events in, a feed's out.
+def feed-embed [input]
+  as-events (scan-emit [] feed-embed-step feed-embed-finish (events input))
+
+; ---------------------------------------------------------------------
+; The reverse
+; ---------------------------------------------------------------------
+
+def feed-unembed-fail [what]
+  fail :unrepresentable (string-join "" ["the feed is not an embedding: " what])
+
+def feed-unembed-kind [value]
+  match (kind value)
+    case :null "null"
+    case :boolean "a boolean"
+    case :number "a number"
+    case :string "a string"
+    case _ "a container"
+
+; The events of an empty root of the kind the feed's category gives.
+def feed-unembed-empty [k]
+  match k
+    case "object" [object-start object-end]
+    case "array" [array-start array-end]
+    case _ (feed-unembed-fail "the feed's category says its root is a scalar, and it has no entry to hold it")
+
+; The kind the feed's category gives, from its term.
+def feed-unembed-root-kind [term]
+  match term
+    case "object" term
+    case "array" term
+    case "value" term
+    case _ (feed-unembed-fail (string-join "" ["the feed's category of the marker has the term " (quoted term) ", where it is object, array or value"]))
+
+; Inside a member that is not read: its value's events are held to a
+; tree's order, one marker for each open container, until the value
+; ends.
+def feed-unembed-skip-value [s open]
+  match (feed-embed-top open)
+    case :none (transition (pop s) [])
+    case :member (transition (feed-embed-mark [:skip (feed-embed-mark :object open)] s) [])
+    case :array (transition s [])
+    case :object (fail :protocol-order "the events hold a value where a key is due, which a tree's never do")
+
+def feed-unembed-skip-open [s open container]
+  match (feed-embed-top open)
+    case :none (transition (feed-embed-mark [:skip (push container open)] s) [])
+    case :member (transition (feed-embed-mark [:skip (push container (feed-embed-mark :object open))] s) [])
+    case :array (transition (feed-embed-mark [:skip (push container open)] s) [])
+    case :object (fail :protocol-order "the events hold a value where a key is due, which a tree's never do")
+
+def feed-unembed-skip-close [s open container]
+  match [(feed-embed-top open) container]
+    case [:object :object] (feed-unembed-skip-closed s (pop open))
+    case [:array :array] (feed-unembed-skip-closed s (pop open))
+    case _ (fail :protocol-order "the events end a container that is not open, or one whose member has no value, which a tree's never do")
+
+def feed-unembed-skip-closed [s open]
+  match (count open)
+    case 0 (transition (pop s) [])
+    case _ (transition (feed-embed-mark [:skip open] s) [])
+
+def feed-unembed-skip [s open event]
+  match event
+    case object-start (feed-unembed-skip-open s open :object)
+    case array-start (feed-unembed-skip-open s open :array)
+    case (key _)
+      match (feed-embed-top open)
+        case :object (transition (feed-embed-mark [:skip (feed-embed-mark :member open)] s) [])
+        case _ (fail :protocol-order "the events hold a key where a value is due, which a tree's never do")
+    case (scalar _) (feed-unembed-skip-value s open)
+    case object-end (feed-unembed-skip-close s open :object)
+    case array-end (feed-unembed-skip-close s open :array)
+
+; The event a category of the value stands for.
+def feed-unembed-event [open term label]
+  match term
+    case "object" object-start
+    case "array" array-start
+    case "end"
+      match (feed-embed-top open)
+        case :obj-start object-end
+        case :obj-key object-end
+        case :arr-start array-end
+        case :arr array-end
+        case _ (feed-unembed-fail "a category ends a container that is not open")
+    case "true" (scalar true)
+    case "false" (scalar false)
+    case "null" (scalar null)
+    case "key" (key (feed-unembed-label term label))
+    case "string" (scalar (feed-unembed-label term label))
+    case "number"
+      match label
+        case :none (feed-unembed-fail "a category of the term \"number\" has no label")
+        case _ (scalar (number label))
+    case _ (feed-unembed-fail (string-join "" ["an entry's category has the term " (quoted term) ", which stands for no event of a tree"]))
+
+; An entry's first category: which part of the root it is. The root
+; opens with the first entry, and every entry must be a part of the same
+; root.
+def feed-unembed-role [rk marker term label]
+  match [term rk]
+    case ["member" :none] [[:open "object"] [object-start (key (feed-unembed-label term label))]]
+    case ["member" [:open "object"]] [rk [(key (feed-unembed-label term label))]]
+    case ["element" :none] [[:open "array"] [array-start]]
+    case ["element" [:open "array"]] [rk []]
+    case ["value" :none] [[:written "value"] []]
+    case ["member" _] (feed-unembed-fail "its entries are not all of one kind: an object's member follows another part")
+    case ["element" _] (feed-unembed-fail "its entries are not all of one kind: an array's element follows another part")
+    case ["value" _] (feed-unembed-fail "a scalar root's entry is not the feed's only one")
+    case _ (feed-unembed-fail (string-join "" ["an entry's first category has the term " (quoted term) ", where it says which part of the root the entry is: member, element or value"]))
+
+def feed-unembed-label [term label]
+  match label
+    case :none (feed-unembed-fail (string-join "" ["a category of the term " (quoted term) " has no label"]))
+    case _ (unquoted label)
+
+; The root must agree with the feed's category, where both are known.
+def feed-unembed-agree [rk marker]
+  match [rk marker]
+    case [_ :none] rk
+    case [[:open k] m] (feed-unembed-same rk k m)
+    case [[:written k] m] (feed-unembed-same rk k m)
+    case _ rk
+
+def feed-unembed-same [rk k m]
+  match [k m]
+    case ["object" "object"] rk
+    case ["array" "array"] rk
+    case ["value" "value"] rk
+    case _ (feed-unembed-fail (string-join "" ["the feed's category says its root is " (feed-unembed-what m) ", and its entries say it is " (feed-unembed-what k)]))
+
+def feed-unembed-what [k]
+  match k
+    case "object" "an object"
+    case "array" "an array"
+    case _ "a scalar"
+
+; A category of an entry has ended: a part's, or one of the value's
+; events. The stack below it is always the feed, its entries, the entry
+; and the entry's categories.
+def feed-unembed-entry-cat [s term label]
+  let [s1 (pop s)]
+    let [cats (top s1)]
+      let [s2 (pop s1)]
+        let [entry (top s2)]
+          let [s3 (pop s2)]
+            let [entries (top s3)]
+              match [(top (pop s3)) entry]
+                case [[:feed rk marker] [:entry :role open]]
+                  match (feed-unembed-role rk marker term label)
+                    case [root2 out]
+                      transition (push cats (push [:entry :value []] (push entries [[:feed (feed-unembed-agree root2 marker) marker]]))) out
+                case [feed [:entry :value open]]
+                  let [event (feed-unembed-event open term label)]
+                    match (feed-embed-open-next open event)
+                      case :bad (feed-unembed-fail "an entry's categories hold events no tree has")
+                      case open2
+                        match (count open2)
+                          case 0 (transition (push cats (push [:entry :complete []] (push entries [feed]))) [event])
+                          case _ (transition (push cats (push [:entry :value open2] (push entries [feed]))) [event])
+                case [_ [:entry :complete _]] (feed-unembed-fail "an entry's categories go on after its value")
+
+; A category of the feed has ended: the root's kind. With no entry the
+; root is written now, empty.
+def feed-unembed-feed-cat [s term]
+  let [s1 (pop s)]
+    let [cats (top s1)]
+      match (top (pop s1))
+        case [:feed rk marker]
+          let [k (feed-unembed-root-kind term)]
+            match marker
+              case :none
+                match rk
+                  case :empty (transition [[:feed [:written k] k] cats] (feed-unembed-empty k))
+                  case _ (transition [[:feed (feed-unembed-agree rk k) k] cats] [])
+              case _ (feed-unembed-same (transition [[:feed rk marker] cats] []) marker k)
+
+; A category has ended: one of the marker counts, any other is not read.
+def feed-unembed-cat-end [s term scheme label]
+  match scheme
+    case "tag:tabnas.dev,2026:feed-embed"
+      match term
+        case :none (feed-unembed-fail "a category of the marker has no term")
+        case _
+          match (top (pop s))
+            case [:cats :feed] (feed-unembed-feed-cat s term)
+            case [:cats :entry] (feed-unembed-entry-cat s term label)
+    case _ (transition (pop s) [])
+
+; The entries have ended: the root's container closes, or, with none,
+; the root is written empty where the feed's category has said its kind.
+def feed-unembed-entries-end [s]
+  match (top (pop s))
+    case [:feed rk marker]
+      match [rk marker]
+        case [[:open "object"] _] (transition [[:feed [:written "object"] marker]] [object-end])
+        case [[:open "array"] _] (transition [[:feed [:written "array"] marker]] [array-end])
+        case [:none :none] (transition [[:feed :empty marker]] [])
+        case [:none _] (transition [[:feed [:written marker] marker]] (feed-unembed-empty marker))
+        case _ (transition [[:feed rk marker]] [])
+
+; The feed has ended: its root must have been written.
+def feed-unembed-feed-end [rk marker]
+  match [rk marker]
+    case [_ :none] (feed-unembed-fail "it has no category of the marker tag:tabnas.dev,2026:feed-embed")
+    case [[:written _] _] (transition [[:done]] [])
+    case [:none _] (transition [[:done]] (feed-unembed-empty marker))
+    case _ (feed-unembed-fail "its root was not written")
+
+; A category's member.
+def feed-unembed-field [c name value]
+  match [c name]
+    case [[:cat t sc l] "term"] [:cat value sc l]
+    case [[:cat t sc l] "scheme"] [:cat t value l]
+    case [[:cat t sc l] "label"] [:cat t sc value]
+
+; A value where one is due.
+def feed-unembed-due [s what event]
+  match [what event]
+    case [:entries array-start] (transition (feed-embed-mark [:entries] s) [])
+    case [:entries _] (feed-unembed-fail "its entries are not a list")
+    case [:feed-cats array-start] (transition (feed-embed-mark [:cats :feed] s) [])
+    case [:entry-cats array-start] (transition (feed-embed-mark [:cats :entry] s) [])
+    case [:feed-cats _] (feed-unembed-fail "its categories are not a list")
+    case [:entry-cats _] (feed-unembed-fail "an entry's categories are not a list")
+    case [[:field name] (scalar value)]
+      match (kind value)
+        case :string
+          let [s1 (pop s)]
+            transition (feed-embed-mark (feed-unembed-field (top s1) name value) s1) []
+        case :null (transition (pop s) [])
+        case _ (feed-unembed-fail (string-join "" ["a category's " name " is " (feed-unembed-kind value) ", where it is text"]))
+    case [[:field name] _] (feed-unembed-fail (string-join "" ["a category's " name " is a container, where it is text"]))
+
+def feed-unembed-step [s event]
+  match (feed-embed-top s)
+    case :none
+      match event
+        case object-start (transition [[:feed :none :none]] [])
+        case (scalar value) (feed-unembed-fail (string-join "" ["its root is " (feed-unembed-kind value) ", where a feed is an object"]))
+        case array-start (feed-unembed-fail "its root is a list, where a feed is an object")
+        case _ (fail :protocol-order "the events begin with an end or a key, which a tree's never do")
+    case [:done] (fail :protocol-order "the events hold more after the root value, which a tree's never do")
+    case [:skip open] (feed-unembed-skip s open event)
+    case [:due what]
+      match event
+        case (key _) (fail :protocol-order "the events hold a key where a value is due, which a tree's never do")
+        case object-end (fail :protocol-order "the events end an object after a key and before its value, which a tree's never do")
+        case array-end (fail :protocol-order "the events end an array inside an object, which a tree's never do")
+        case _ (feed-unembed-due s what event)
+    case [:feed rk marker]
+      match event
+        case (key "entries") (transition (push [:due :entries] s) [])
+        case (key "categories") (transition (push [:due :feed-cats] s) [])
+        case (key _) (transition (push [:skip []] s) [])
+        case object-end (feed-unembed-feed-end rk marker)
+        case _ (fail :protocol-order "the events hold a value where a key is due, which a tree's never do")
+    case [:entries]
+      match event
+        case object-start (transition (push [:entry :role []] s) [])
+        case array-end (feed-unembed-entries-end s)
+        case (key _) (fail :protocol-order "the events hold a key inside a list, which a tree's never do")
+        case object-end (fail :protocol-order "the events end an object inside a list, which a tree's never do")
+        case _ (feed-unembed-fail "an entry is not an object")
+    case [:entry phase open]
+      match event
+        case (key "categories") (transition (push [:due :entry-cats] s) [])
+        case (key _) (transition (push [:skip []] s) [])
+        case object-end
+          match phase
+            case :complete (transition (pop s) [])
+            case :role (feed-unembed-fail "an entry has no category of the marker")
+            case _ (feed-unembed-fail "an entry's categories end inside its value")
+        case _ (fail :protocol-order "the events hold a value where a key is due, which a tree's never do")
+    case [:cats where]
+      match event
+        case object-start (transition (push [:cat :none :none :none] s) [])
+        case array-end (transition (pop s) [])
+        case (key _) (fail :protocol-order "the events hold a key inside a list, which a tree's never do")
+        case object-end (fail :protocol-order "the events end an object inside a list, which a tree's never do")
+        case _ (feed-unembed-fail "a category is not an object")
+    case [:cat term scheme label]
+      match event
+        case (key "term") (transition (push [:due [:field "term"]] s) [])
+        case (key "scheme") (transition (push [:due [:field "scheme"]] s) [])
+        case (key "label") (transition (push [:due [:field "label"]] s) [])
+        case (key _) (transition (push [:skip []] s) [])
+        case object-end (feed-unembed-cat-end s term scheme label)
+        case _ (fail :protocol-order "the events hold a value where a key is due, which a tree's never do")
+
+def feed-unembed-finish [s]
+  match (feed-embed-top s)
+    case [:done] []
+    case :none (fail :protocol-order "the events hold no value, where a tree's hold one")
+    case _ (fail :protocol-order "the events ended inside a container, which a tree's never do")
+
+; The reverse: the events of a feed read back, in; the plain tree's out.
+def feed-unembed [input]
+  as-events (scan-emit [] feed-unembed-step feed-unembed-finish (events input))

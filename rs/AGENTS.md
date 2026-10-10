@@ -9,7 +9,8 @@ the parsed feed. This file covers only what is specific to this crate.
 
 | Path | |
 |---|---|
-| `src/lib.rs` | everything: `FeedOptions`, `detect`, `convert`, the dialect parsers, the native-to-Atom mapping, `feed`, `plugin`, `make`, `make_with`, `parse` |
+| `src/lib.rs` | everything: `FeedOptions`, `detect`, `convert`, the dialect parsers, the native-to-Atom mapping, `feed`, `plugin`, `make`, `make_with`, `parse`; and the translation parts, `translate()` (its `embed` and `render`) with `manifest_text` and `render_text`, `include_str!` of the copies in `translate/` |
+| `translate/` | the crate's copies of `../tabnas.plugin.json` (as `manifest.json`), `../alchemy/render.alc` and `../alchemy/embed.alc`, which a packaged crate needs, written by `npm run embed` from `../ts`; `tests/translate_test.rs` holds them to the files |
 | `tests/parity_test.rs` | every `../test/spec/*.tsv` fixture, plus the recorded-divergence exemption list and the named-column census |
 | `tests/conformance_test.rs` | both FETCHED corpora, `../test/feedvalidator/` and `../test/feedparser/`, including the `Expect:` evaluator |
 | `tests/divergent_test.rs` | `../test/divergent.tsv`, through `tabnas_support::Register` |
@@ -17,6 +18,7 @@ the parsed feed. This file covers only what is specific to this crate.
 | `tests/debug_model_test.rs` | the composition test, mirrored from `ts/test/debug-model.test.ts` |
 | `tests/perf_test.rs` | reusing an instance beats rebuilding one, mirrored from `go/perf_test.go` |
 | `tests/version_test.rs` | `Cargo.toml`, `VERSION`, `ts/package.json` and `go/feed.go` must agree |
+| `tests/translate_test.rs` | the translation parts: the render and the embedding the embedded manifest names are the ones the crate embeds, the manifest's shapes, root, schema and loss lines, and every definition of both named `feed-...` |
 | `tests/common/mod.rs` | the parsers, the value normaliser and the fixture runner the suites share |
 | `README.md` | the crate front page, doctested, and in the gated prose set |
 
