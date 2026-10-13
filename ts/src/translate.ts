@@ -68,7 +68,8 @@ const TRANSLATION: TranslationParts = Object.freeze({
       "A character XML 1.0 cannot carry, which the reader builds only from a character reference no well-formed document holds, is written as U+FFFD, the replacement character.",
       "A plain tree, from another format or a program, is written through the embedding: an object's members, an array's elements or a scalar root as the entries, each titled by its value's own title where that is a string and otherwise by its key or its position, its content the value's compact JSON text, and its categories of the scheme tag:tabnas.dev,2026:feed-embed the value itself, from which the reverse reads it back exactly.",
       "In the embedding the feed's id is tag:tabnas.dev,2026:feed-embed, an entry's is that, a slash and the entry's position, and every updated is 1970-01-01T00:00:00Z, since a plain tree has neither an identity nor a time."
-    ]
+    ],
+    "whole": "A feed is converted from its element tree into the Atom-shaped tree only when the root element closes, whatever its dialect, so a document's tree is complete only at its end: it is read whole before anything is written."
   }
 }
 `,
