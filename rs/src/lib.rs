@@ -821,7 +821,6 @@ fn parse_atom(root: &Value, atom03: bool) -> Value {
     let mut feed = Obj::new();
     feed.text("format", "atom");
     feed.text("version", if atom03 { "0.3" } else { "1.0" });
-    feed.set("entries", Value::array(Vec::new()));
 
     if let Some(id) = find_child(root, "id") {
         feed.text("id", text_of(Some(id)));
@@ -1189,7 +1188,6 @@ fn rss2_to_atom(rss: &Value) -> Value {
     let mut out = Obj::new();
     out.text("format", "atom");
     out.text("version", "1.0");
-    out.set("entries", Value::array(Vec::new()));
 
     if let Some(title) = truthy(rss, "title") {
         out.set("title", atom_text("text", title));
@@ -1354,7 +1352,6 @@ fn rss1_to_atom(rss: &Value) -> Value {
     let mut out = Obj::new();
     out.text("format", "atom");
     out.text("version", "1.0");
-    out.set("entries", Value::array(Vec::new()));
 
     if let Some(title) = truthy(rss, "title") {
         out.set("title", atom_text("text", title));
