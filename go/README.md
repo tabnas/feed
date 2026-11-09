@@ -49,6 +49,12 @@ RFC 4287. Pass `map[string]any{"format": "native"}` to keep the source
 dialect's struct, or `"raw"` for the underlying `map[string]any` XML
 element tree.
 
+`tabnasfeed.Make()` builds the same parser and declares the engine's
+window option on it, so `ParseReader` reads a feed from a reader a
+window at a time rather than whole. The
+[reference](doc/reference.md#registration-and-the-parse-entry) has the
+details.
+
 ## Documentation
 
 Full docs follow the four [Diátaxis](https://diataxis.fr) quadrants:

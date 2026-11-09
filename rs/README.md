@@ -53,6 +53,24 @@ Building a parser costs far more than a parse, because the plugin pulls
 in the whole XML grammar, so build one and reuse it. The shared instance
 behind `parse` is built once and is safe to use from several threads.
 
+A parser can also read a UTF-8 feed from a reader. `make` and
+`make_with` declare the engine's `lex.window` option, so
+`Tabnas::parse_reader` keeps a window of the source, from the oldest
+token the parser holds to some 64 KiB past the cursor, rather than the
+whole text. The tokens are tabnas-xml's, whose matcher reads the text
+only through that window, and the conversion reads the finished tree
+only. The value and the errors are those of `parse` of the same text,
+but for an error's excerpt of a very long line.
+
+```rust,no_run
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let parser = tabnas_feed::make();
+    let feed = parser.parse_reader(std::fs::File::open("feed.xml")?)?;
+    println!("{}", feed.to_json()["title"]);
+    Ok(())
+}
+```
+
 Options are a typed struct rather than a loose bag, so a misspelled name
 is a compile error:
 
