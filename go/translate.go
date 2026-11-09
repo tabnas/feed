@@ -16,6 +16,9 @@ type TranslationParts struct {
 	// schema, with its reverse.
 	Embed  *TranslationPart
 	Render *TranslationPart
+	// Transduce is the transducer: a feed's JSON events from its parser's
+	// rule passes, for a host that reads parser events.
+	Transduce *TranslationPart
 }
 
 // The copies ../ts/embed-translate.js writes (npm run embed), since a Go
@@ -30,10 +33,17 @@ var translationEmbed string
 //go:embed translate/render.alc
 var translationRender string
 
+//go:embed translate/transduce.alc
+var translationTransduce string
+
 var translationParts = TranslationParts{
 	Manifest: translationManifest,
 	Embed:    &TranslationPart{Entry: "feed-embed", Source: translationEmbed},
 	Render:   &TranslationPart{Entry: "feed-render", Source: translationRender},
+	Transduce: &TranslationPart{
+		Entry:  "feed-transduce",
+		Source: translationTransduce,
+	},
 }
 
 // Translate returns the feed format's translation parts.
@@ -44,6 +54,7 @@ func Translate() *TranslationParts {
 	parts.Lift = copyPart(parts.Lift)
 	parts.Embed = copyPart(parts.Embed)
 	parts.Render = copyPart(parts.Render)
+	parts.Transduce = copyPart(parts.Transduce)
 	return &parts
 }
 

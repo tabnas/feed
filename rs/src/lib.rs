@@ -56,7 +56,7 @@ pub use tabnas::TabnasError as FeedError;
 /// This crate's version. It MUST equal `ts/package.json` `"version"` and
 /// `const VERSION` in `go/feed.go`; `tests/version_test.rs` fails the
 /// build if they drift.
-pub const VERSION: &str = "0.6.18";
+pub const VERSION: &str = "0.6.19";
 
 /// The name the plugin registers under, and so the namespace of its
 /// plugin options.
@@ -1624,6 +1624,9 @@ pub struct TranslationParts {
     pub embed: Option<TranslationPart>,
     /// An optional render from the write shape to text.
     pub render: Option<TranslationPart>,
+    /// An optional transducer: the format's JSON events from its parser's
+    /// rule passes, for a host that reads parser events.
+    pub transduce: Option<TranslationPart>,
 }
 
 const TRANSLATION: TranslationParts = TranslationParts {
@@ -1636,6 +1639,10 @@ const TRANSLATION: TranslationParts = TranslationParts {
     render: Some(TranslationPart {
         entry: "feed-render",
         source: Some(include_str!("../translate/render.alc")),
+    }),
+    transduce: Some(TranslationPart {
+        entry: "feed-transduce",
+        source: Some(include_str!("../translate/transduce.alc")),
     }),
 };
 
@@ -1650,10 +1657,12 @@ pub const fn translate() -> Option<TranslationParts> {
 /// shape a feed is read as and written from (`tree`), the root the render
 /// takes, the schema of the tree its events carry (`feed`), the files
 /// that hold the embedding of a plain tree in that schema and the render,
-/// and the sentences that say what a written document does not keep. The
-/// crate embeds its own copy, `translate/manifest.json`, since a packaged
-/// crate holds nothing outside `rs/`; `tests/translate_test.rs` holds the
-/// copy to the file.
+/// the file that holds the transducer part (`transduce`), through which a
+/// host that reads parser events reads a feed's tree from the grammar's
+/// rule passes as they come, and the sentences that say what a written
+/// document does not keep. The crate embeds its own copy,
+/// `translate/manifest.json`, since a packaged crate holds nothing
+/// outside `rs/`; `tests/translate_test.rs` holds the copy to the file.
 ///
 /// ```
 /// assert!(tabnas_feed::manifest_text().contains("\"translate\""));
@@ -1667,10 +1676,15 @@ pub fn manifest_text() -> &'static str {
 /// `export`, whose entry point `feed-render` writes a tree's events as one
 /// document. A host links it with its own program. The crate embeds its
 /// own copy, `translate/render.alc`, held to the file as the manifest's
-/// is; the embedding, `translate/embed.alc`, is `translate().embed`.
+/// is; the embedding, `translate/embed.alc`, is `translate().embed`, and
+/// the transducer part, `translate/transduce.alc`, is
+/// `translate().transduce`.
 ///
 /// ```
 /// assert!(tabnas_feed::render_text().contains("def feed-render [input]"));
+/// let parts = tabnas_feed::translate().expect("the feed format has parts");
+/// let transduce = parts.transduce.expect("the feed format has a transducer part");
+/// assert_eq!(transduce.entry, "feed-transduce");
 /// ```
 pub fn render_text() -> &'static str {
     match TRANSLATION.render {
