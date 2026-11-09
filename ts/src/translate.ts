@@ -57,13 +57,13 @@ const TRANSLATION: TranslationParts = Object.freeze({
       "An RSS feed is written as the Atom feed the reader makes of it, so what that mapping leaves out is not written: a channel's language, docs, cloud, ttl, textInput, skipHours and skipDays, its image but for its URL, which is the logo, its webMaster beside a managingEditor, and its pubDate beside a lastBuildDate.",
       "An RSS item's guid is written as its entry's id without its isPermaLink flag, and its source as Atom's source element, which the reader does not read back.",
       "A text construct or a content of type xhtml is written as type html, its markup as escaped text, and reads back as html with its value trimmed.",
-      "A feed's own elements are written in the order of the tree's members and its entries after them, as Atom requires; the reader puts the entries before the feed's own members, so the entries of a feed it built are held until the feed ends, under max_metadata_bytes, and only where every member a feed can have but format and version comes before them, a null one included, as in the embedding, is each entry written as it comes.",
+      "A feed's own elements are written in the order of the tree's members, and each entry after them as it comes, as Atom requires and as every reader and the embedding build a feed, its entries last; a tree with a member of the feed after its entries, which no reader builds, is refused part way with TARGET_VALUE_UNREPRESENTABLE.",
       "A feed with no id, or a null one, is written with the id tag:tabnas.dev,2026:feed-render, which Atom requires, and an entry with none with that id, a slash and its position among the feed's entries from 0, so that no two such entries share one; each reads back as that id.",
       "A feed or an entry with no title, or a null one, is written with an empty title of type text, which Atom requires, and reads back with that title.",
       "A feed or an entry with no updated, or a null one, is written with the updated 1970-01-01T00:00:00Z, which Atom requires and which is the date the embedding gives a plain tree, and reads back with that date.",
       "A date, a feed's or a source's updated or an entry's updated or published, is written in RFC 3339's form, which Atom requires: one in that form as it is, a t or a z in it in upper case, and one in RFC 822's form, as RSS writes dates, as the same instant, its zone as Z or as the offset it names (EST as -05:00, +0100 as +01:00), a two-digit year read as RFC 2822 reads one and seconds as 00 where it has none, so its day of the week and the spelling of its zone, its year and its names do not read back.",
       "A date in neither form, among them one with a comment or with a military zone but Z, is written as 1970-01-01T00:00:00Z followed by a category whose scheme is tag:tabnas.dev,2026:feed-render/date, whose term names the member (updated or published) and whose label is the date's text, and it reads back as that category; a date with no text is written as a missing one is.",
-      "A feed without an author, which Atom requires of a feed unless every entry has one, is written with one named by the feed's title where that is text and not empty, and unknown otherwise, with the uri tag:tabnas.dev,2026:feed-render, which reads back as that author; where the render holds the feed's entries, as it does for a feed the reader built, it writes none when the feed has entries and every one has an author.",
+      "A feed without an author, which Atom requires of a feed unless every entry has one, is written with one named by the feed's title where that is text and not empty, and unknown otherwise, with the uri tag:tabnas.dev,2026:feed-render, which reads back as that author, though every entry may have one, since the feed's elements are written before its entries are seen.",
       "A member whose value is null is not written.",
       "A character XML 1.0 cannot carry, which the reader builds only from a character reference no well-formed document holds, is written as U+FFFD, the replacement character.",
       "A plain tree, from another format or a program, is written through the embedding: an object's members, an array's elements or a scalar root as the entries, each titled by its value's own title where that is a string and otherwise by its key or its position, its content the value's compact JSON text, and its categories of the scheme tag:tabnas.dev,2026:feed-embed the value itself, from which the reverse reads it back exactly.",
@@ -765,17 +765,14 @@ def feed-unembed [input]
 ; link's \`length\` is a number), and a member whose value is null is not
 ; written.
 ;
-; Atom puts a feed's own elements before its entries, so the feed's
-; members but \`entries\` are written in the order the tree holds them,
-; and the entries after them, whatever the tree's order. The reader puts
-; \`entries\` before the feed's other members, so the entries of a tree it
-; built are held until the feed ends: the whole list is captured, under
-; max_metadata_bytes, and written after the feed's last member. When
-; every member a feed can have but \`format\` and \`version\`, which are not
-; written, comes before \`entries\`, a null one included, nothing written
-; can follow them, so each entry is written as it comes, captured on its
-; own under max_record_bytes, and nothing is held; the embedding builds
-; its feeds so. Atom gives the children of an entry, a source and a
+; Atom puts a feed's own elements before its entries, and every reader
+; and the embedding build a feed so, \`entries\` its last member (admin
+; ADR-33): the feed's members are written in the order the tree holds
+; them, and each entry as it comes, captured on its own under
+; max_record_bytes, so nothing is held. A member of the feed after its
+; entries, which no reader builds, is refused part way with
+; TARGET_VALUE_UNREPRESENTABLE, since the elements that go before the
+; entries are written by then. Atom gives the children of an entry, a source and a
 ; person no order, and the reader takes any, so their members are written
 ; in the tree's order. An entry's \`source\`, which the reader makes of an
 ; RSS item's source, is written as Atom's \`source\` element, which the
@@ -809,12 +806,10 @@ def feed-unembed [input]
 ;
 ; Atom requires an author of a feed unless every entry has one. A feed
 ; whose author the tree does not give, as none, null or an empty list, is
-; written with the render's after its other members: named by the feed's
-; title where that is text and not empty and \`unknown\` otherwise, with the
-; render's id as its uri. Where the entries are held the render sees them
-; first, and writes no author for a feed with entries that all have one;
-; where each entry is written as it comes it cannot, and writes the
-; author before the first.
+; written with the render's after its other members and before its first
+; entry, since what follows cannot be seen: named by the feed's title
+; where that is text and not empty and \`unknown\` otherwise, with the
+; render's id as its uri.
 ;
 ; A tree that is not a feed fails with TARGET_VALUE_UNREPRESENTABLE,
 ; naming what was met: a root that is not an object, a member a feed, an
@@ -829,13 +824,11 @@ def feed-unembed [input]
 ; The render is three stages. The check (\`feed-check\`) reads the tree's
 ; events and hands them on: it refuses what is not a feed's, drops a
 ; member whose value is null and the \`format\` and \`version\` it does not
-; write, adds the members the conventions above write, and hands held
-; entries on under the key \`$held\`, which no feed has. The router
-; captures each of the feed's members, the held entries whole and the
-; entries written as they come one at a time, and hands each on when it
-; ends. The writer (\`feed-write-step\`) writes each as it comes, the
-; document's start before the first, and keeps the held entries until the
-; feed ends.
+; write, and adds the members the conventions above write, the feed's
+; before its entries. The router captures each of the feed's members and
+; each entry, one at a time, and hands each on when it ends. The writer
+; (\`feed-write-step\`) writes each as it comes, the document's start
+; before the first.
 ;
 ; The check's state is a stack of markers, one for each container it is
 ; inside:
@@ -844,7 +837,7 @@ def feed-unembed [input]
 ;                            can have whether it is :absent, met with a
 ;                            null value or none yet (:null) or :present,
 ;                            and \`done\` whether the feed's conventions
-;                            are out
+;                            are out, as they are once its entries begin
 ;   [:entry present pos]     an entry; \`present\` says whether its id,
 ;                            title and updated are, and \`pos\` is its
 ;                            position as a vector of decimal digits
@@ -863,12 +856,11 @@ def feed-unembed [input]
 ;
 ; Once the feed is closed the state is \`[:done]\`, and nothing may follow
 ; it. The writer's state is \`[:start]\` before the first value, \`[:open
-; author title]\` after it, \`[:held author title entries]\` once held
-; entries are in, and \`[:entries]\` once an entry is written as it comes:
+; author title]\` after it, and \`[:entries]\` once an entry is written:
 ; \`author\` says whether the feed's author is written, and \`title\` is the
-; text of its title. Beside the held entries nothing grows with a
-; document's width or length but an entry's position, by a digit each
-; time the count of entries grows tenfold.
+; text of its title. Nothing grows with a document's width or length but
+; an entry's position, by a digit each time the count of entries grows
+; tenfold.
 
 ; The characters XML 1.0 can carry, as code point ranges.
 def feed-xml-chars [[9 10] [13 13] [32 55295] [57344 65533] [65536 1114111]]
@@ -1455,13 +1447,6 @@ def feed-has [slots name]
     case :present true
     case _ false
 
-; Whether every member a feed can have but format, version and entries
-; has been met, so that nothing written can follow the entries.
-def feed-closed [slots]
-  match (count (filter (fn [i] (match (get-path (path i) slots) (case :absent false) (case _ true))) [3 4 5 6 7 8 9 10 11 12 13 14]))
-    case 12 true
-    case _ false
-
 ; The events of what the feed lacks, and of what an entry lacks.
 def feed-completions [slots]
   feed-complete-updated (feed-has slots "updated")
@@ -1472,9 +1457,6 @@ def feed-entry-completions [present pos]
   feed-complete-updated (get-path (path 2) present)
     feed-complete-title (get-path (path 1) present)
       feed-complete-id (get-path (path 0) present) (string-join "" [feed-render-id "/" (string-join "" pos)]) []
-
-; The key the held entries are handed on under.
-def feed-held-key "$held"
 
 ; The root: the feed.
 def feed-check-root [event]
@@ -1493,7 +1475,10 @@ def feed-in-feed [s slots done event]
         case :none (feed-fail (string-join "" ["the feed has the member " (quoted name) ", which the reader's never has"]))
         case member
           match (get-path (path (feed-slot name)) slots)
-            case :absent (feed-feed-key s (feed-put slots (feed-slot name) :null) done member name)
+            case :absent
+              if done
+                feed-fail (string-join "" ["the feed has the member " (quoted name) " after its entries, which every reader puts last"])
+                feed-feed-key s (feed-put slots (feed-slot name) :null) done member name
             case _ (fail :protocol-order (string-join "" ["the events hold the feed's member " (quoted name) " twice, which a tree's never do"]))
     case object-end
       if done
@@ -1501,15 +1486,11 @@ def feed-in-feed [s slots done event]
         transition [[:done]] (push event (feed-completions slots))
     case _ (fail :protocol-order "the events hold a value where a key is due, which a tree's never do")
 
-; A member of the feed: its value is due. The entries are held, handed
-; on under another key, unless every member written that could follow
-; them has come, when what the feed lacks goes before them.
+; A member of the feed: its value is due. What the feed lacks goes
+; before its entries, which come last, each written as it comes.
 def feed-feed-key [s slots done member name]
   match name
-    case "entries"
-      if (feed-closed slots)
-        transition (push [:due member name name] (feed-mark [:feed slots true] s)) (feed-completions slots)
-        transition (push [:due member name feed-held-key] (feed-mark [:feed slots done] s)) []
+    case "entries" (transition (push [:due member name name] (feed-mark [:feed slots true] s)) (feed-completions slots))
     case _ (transition (push [:due member name name] (feed-mark [:feed slots done] s)) [])
 
 ; An entry: a member, or its end, before which what it lacks is handed
@@ -1648,13 +1629,11 @@ def feed-check [input]
   as-events (scan-emit [] feed-check-step feed-check-finish (events input))
 
 ; ---------------------------------------------------------------------
-; The router: the held entries whole, each entry written as it comes on
-; its own, and each of the feed's members
+; The router: each entry on its own, and each of the feed's members
 ; ---------------------------------------------------------------------
 
 def feed-captures
   vector
-    capture :held (path feed-held-key) :max_metadata_bytes
     capture :entry (path "entries" each-index) :max_record_bytes
     capture :id (path "id") :max_metadata_bytes
     capture :title (path "title") :max_metadata_bytes
@@ -1780,33 +1759,16 @@ def feed-title-text [v]
         case _ ""
     case _ ""
 
-; Whether the feed, its author not written, is to have the render's: it
-; is unless it has entries and every one has an author, which Atom then
-; takes instead.
-def feed-needs-author [author es]
-  match author
-    case true false
-    case false
-      match (count es)
-        case 0 true
-        case _
-          match (compare (count (filter (fn [e] (feed-has-items (get "authors" e))) es)) (count es))
-            case :equal false
-            case _ true
-
 ; The writer's state once it has begun: whether the feed's author is
-; written and its title's text, and the held entries once they are in.
+; written and its title's text.
 def feed-note [s tag v]
   match [tag s]
     case [:authors [:open _ title]] [:open (feed-has-items v) title]
-    case [:authors [:held _ title es]] [:held (feed-has-items v) title es]
     case [:title [:open author _]] [:open author (feed-title-text v)]
-    case [:title [:held author _ es]] [:held author (feed-title-text v) es]
     case _ s
 
 def feed-write-item [s item out]
   match [s item]
-    case [[:open author title] (selected :held v)] (transition [:held author title v] out)
     case [[:open author title] (selected :entry v)]
       if author
         transition [:entries] (push (feed-w-entry "  " v) out)
@@ -1829,12 +1791,6 @@ def feed-write-finish [s]
       if author
         ["</feed>\\n"]
         [(feed-w-author title) "</feed>\\n"]
-    case [:held author title v]
-      let [es (as-vector v)]
-        let [body (join "" (map (fn [e] (feed-w-entry "  " e)) es))]
-          if (feed-needs-author author es)
-            [(feed-w-author title) body "</feed>\\n"]
-            [body "</feed>\\n"]
     case _ ["</feed>\\n"]
 
 ; The render: a feed tree's events in, the Atom document's text out.

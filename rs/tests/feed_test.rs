@@ -219,7 +219,7 @@ fn an_unknown_namespace_is_carried_rather_than_refused() {
         .expect("a declared foreign namespace is well-formed");
     assert_eq!(
         json(&value),
-        r#"{"format":"atom","version":"1.0","entries":[],"title":{"type":"text","value":"x"}}"#
+        r#"{"format":"atom","version":"1.0","title":{"type":"text","value":"x"},"entries":[]}"#
     );
 
     // The same is true of the ROOT: only the local name selects the
@@ -247,7 +247,7 @@ fn a_mixed_dialect_document_follows_its_root() {
         .expect("the document parses");
     assert_eq!(
         json(&value),
-        r#"{"format":"atom","version":"1.0","entries":[{"title":{"type":"text","value":"i"}}],"title":{"type":"text","value":"t"}}"#
+        r#"{"format":"atom","version":"1.0","title":{"type":"text","value":"t"},"entries":[{"title":{"type":"text","value":"i"}}]}"#
     );
 }
 

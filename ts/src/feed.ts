@@ -488,10 +488,11 @@ function parseAtomEntry(el: XmlElement, atom03: boolean): AtomEntry {
 
 function parseAtom(root: XmlElement, version: 'atom10' | 'atom03'): AtomFeed {
   const atom03 = version === 'atom03'
-  const feed: AtomFeed = {
+  // The feed's own members first and its entries last, as Atom writes
+  // them, so that a render writes each entry as it comes (admin ADR-33).
+  const feed: Omit<AtomFeed, 'entries'> = {
     format: 'atom',
     version: atom03 ? '0.3' : '1.0',
-    entries: [],
   }
 
   const id = findChild(root, 'id')
@@ -530,9 +531,7 @@ function parseAtom(root: XmlElement, version: 'atom10' | 'atom03'): AtomFeed {
   const subtitle = findChild(root, atom03 ? 'tagline' : 'subtitle')
   if (subtitle) feed.subtitle = parseText(subtitle)
 
-  feed.entries = findChildren(root, 'entry').map((e) => parseAtomEntry(e, atom03))
-
-  return feed
+  return { ...feed, entries: findChildren(root, 'entry').map((e) => parseAtomEntry(e, atom03)) }
 }
 
 
@@ -761,10 +760,10 @@ function parseRss1(root: XmlElement, version: FeedVersion): Rss1Feed {
 // --- Native -> Atom conversions -------------------------------------------
 
 function rss2ToAtom(rss: Rss2Feed): AtomFeed {
-  const out: AtomFeed = {
+  // The feed's own members first and its entries last (admin ADR-33).
+  const out: Omit<AtomFeed, 'entries'> = {
     format: 'atom',
     version: '1.0',
-    entries: [],
   }
 
   if (rss.title) out.title = { type: 'text', value: rss.title }
@@ -806,9 +805,7 @@ function rss2ToAtom(rss: Rss2Feed): AtomFeed {
     out.authors = persons
   }
 
-  out.entries = rss.items.map(rss2ItemToAtomEntry)
-
-  return out
+  return { ...out, entries: rss.items.map(rss2ItemToAtomEntry) }
 }
 
 function parseRssPerson(s: string): AtomPerson {
@@ -867,10 +864,10 @@ function rss2ItemToAtomEntry(item: Rss2Item): AtomEntry {
 }
 
 function rss1ToAtom(rss: Rss1Feed): AtomFeed {
-  const out: AtomFeed = {
+  // The feed's own members first and its entries last (admin ADR-33).
+  const out: Omit<AtomFeed, 'entries'> = {
     format: 'atom',
     version: '1.0',
-    entries: [],
   }
 
   if (rss.title) out.title = { type: 'text', value: rss.title }
@@ -880,7 +877,7 @@ function rss1ToAtom(rss: Rss1Feed): AtomFeed {
   if (rss.link) out.links = [{ href: rss.link, rel: 'alternate' }]
   if (rss.image?.url) out.logo = rss.image.url
 
-  out.entries = rss.items.map((it) => {
+  const entries = rss.items.map((it) => {
     const e: AtomEntry = {}
     if (it.title) e.title = { type: 'text', value: it.title }
     if (it.description) e.summary = { type: 'text', value: it.description }
@@ -889,7 +886,7 @@ function rss1ToAtom(rss: Rss1Feed): AtomFeed {
     return e
   })
 
-  return out
+  return { ...out, entries }
 }
 
 
