@@ -1,0 +1,856 @@
+; Feeds' transducer part: a feed's JSON events from its grammar's rule
+; passes, for a host that reads parser events (dmog's `translate` and
+; `run --grammar feed`). This is a library of definitions, each named
+; `feed-transduce-...`, which a host links with its own program; its entry
+; point is `feed-transduce`, and nothing else here is the host's to call.
+;
+; The tree is the one the reader builds by default, the Atom-shaped feed
+; of an Atom 1.0 or 0.3 document and of an RSS 0.90 to 2.0 one, and every
+; event is the one the walk of the reader's value gives, members in the
+; reader's order: `format` and `version`, the feed's other members, and
+; `entries` last. The reader converts the element tree only when the root
+; element closes, so this part does what its conversion does, as the
+; passes come. The feed's grammar is xml's with no rules of its own, so
+; the passes are xml's: an `element`'s open carries its start tag's token,
+; whose value is the element's name and its attributes in source order
+; (an attribute the DOCTYPE defaults among them), a `child`'s open carries
+; a text's token (a CDATA section's too, and an entity as its replacement
+; text), and an `element`'s close ends it; the rest pass by.
+;
+; The reader reads an element of the feed's own level by its local name,
+; the first of a name for a member of one value and every one for a list
+; (authors, links, entries), and an element's text as its own text
+; children joined and trimmed as JavaScript trims. So the part reads in
+; two stages, with a router between them:
+;
+; - The reading (`feed-transduce-read`) writes, for each element of the
+;   feed's own level the reader reads, a unit of a document of its own:
+;   `start`, the dialect, at the root's start; `m` for a member of the
+;   feed; `e` for an entry; and `ch` where an RSS feed's first channel
+;   begins. A unit is the element's summary: its local name `l`, its
+;   attributes `a`, and `c`, its texts and its elements' summaries, as deep
+;   as the reader reads them (an entry's person's name), or, for an Atom
+;   text construct or content of type xhtml, `x`, the pieces of the markup
+;   the reader serialises, the inner markup of its first div between two
+;   marks. Nothing is held: each event is written as its pass comes.
+; - The router captures each unit as it ends: a member under
+;   max_metadata_bytes, an entry on its own under max_record_bytes.
+; - The writing (`feed-transduce-write`) writes `format` and `version` at
+;   once. The reader computes each of the feed's other members from the
+;   elements of the feed's whole level and writes them in an order of its
+;   own, so the writing holds them until the first entry begins or the
+;   feed ends, then writes them as the reader computes them, and then
+;   each entry as its element closes.
+;
+; RSS allows a member of the feed after its first item, and Atom an
+; element of the feed after its first entry. The reader reads them, but
+; the feed's members are written by then: a member after the first entry
+; that changes them is refused in the part's own words (`fail
+; :unstreamable`, STREAMABILITY_UNKNOWN), and a host that reads a part
+; reads such a document whole. One that changes nothing, a second id
+; say, is read as the reader reads it, which is to ignore it. So is a
+; channel after an item of an RSS feed's root, whose items the reader
+; takes from the channel instead; a root the reader does not recognise
+; is its own refusal, made at the root's start (`fail :invalid`). A
+; document the grammar refuses fails the run after the events the passes
+; before the refusal give, as the walk fails it. Over the 4,030
+; documents of this repository's corpora (the rows of `test/spec/*.tsv`
+; with the default options, `test/feedparser-wellformed/`, and the
+; feedvalidator and feedparser trees `make fetch` fetches), read in Rust,
+; TypeScript and Go, the part writes what the walk of the reader's value
+; writes for every document the reader reads but two, each an element of
+; the feed after its first entry (feedvalidator's
+; `misplaced-metadata.xml` and `item_too_early.xml`), which it refuses,
+; and fails where the reader fails for every other: the Rust and Go
+; readers read 3,616 of them, and the TypeScript reader 13 more.
+;
+; The reading's state is [dialect stack]: the dialect once the root has
+; begun, and a frame per open element, innermost last: [:root chan] for
+; the root, whether an RSS feed's first channel has ended; [:channel] for
+; that channel; [:node kids unit] for an element whose summary is written,
+; what its child elements become and whether it is a unit; [:xh unit div]
+; for an xhtml construct, whether its first div has begun; [:ser name
+; opened first] for an element of its markup, whether its start tag's `>`
+; is written and whether it is the first div; and [:skip] for an element
+; the reader does not read. The writing's state is [:start], then [:head
+; dialect els] while the members are held, `els` the members' units, and
+; [:body dialect els] once they are written. Nothing grows with a
+; document's length but the members held, under max_metadata_bytes.
+
+; ---------------------------------------------------------------------
+; Names
+; ---------------------------------------------------------------------
+
+; The namespace that makes a `feed` root Atom 0.3, not 1.0.
+def feed-transduce-atom03 "http://purl.org/atom/ns#"
+
+; The elements of a feed's own level the reader reads a member of the
+; feed from, by dialect: Atom 1.0's and 0.3's children of the root; RSS's
+; children of the channel, or of the root where there is no channel; and
+; RSS 1.0's children of the root, its channel and its image (the
+; channel's own children are read from inside it).
+def feed-transduce-atom10-members ["id" "title" "updated" "author" "contributor" "category" "link" "generator" "icon" "logo" "rights" "subtitle"]
+
+def feed-transduce-atom03-members ["id" "title" "modified" "author" "contributor" "category" "link" "generator" "icon" "logo" "copyright" "tagline"]
+
+def feed-transduce-rss-members ["title" "link" "description" "copyright" "managingEditor" "webMaster" "pubDate" "lastBuildDate" "generator" "image" "category"]
+
+def feed-transduce-rdf-members ["channel" "image"]
+
+; The Atom elements the reader reads as a text construct or a content,
+; whose value is the markup they hold where their type is xhtml.
+def feed-transduce-constructs ["title" "subtitle" "rights" "copyright" "summary" "tagline" "content"]
+
+def feed-transduce-among [names name]
+  match (count (filter (fn [n] (equal n name)) names))
+    case 0 false
+    case _ true
+
+; An element's local name: its name after the first colon, or the whole
+; name where it has none.
+def feed-transduce-local [name]
+  let [parts (first-split ":" name)]
+    match (count parts)
+      case 1 name
+      case _ (get-path (path 1) parts)
+
+; The default namespace a root element declares: the last of its xmlns
+; and xmlns: attributes, as xml's reader takes it; "" for none.
+def feed-transduce-default-namespace [attrs]
+  let [declared (filter (fn [k] (match k (case "xmlns" true) (case "xmlns:" true) (case _ false))) (keys attrs))]
+    match (count declared)
+      case 0 ""
+      case _ (get (top declared) attrs)
+
+; A root element's namespace, from its own attributes, since nothing is
+; above it: its prefix's, or the default namespace for no prefix.
+def feed-transduce-namespace [name attrs]
+  let [parts (first-split ":" name)]
+    match (count parts)
+      case 1 (feed-transduce-default-namespace attrs)
+      case _
+        match (get-path (path 0) parts)
+          case "" (feed-transduce-default-namespace attrs)
+          case "xml" "http://www.w3.org/XML/1998/namespace"
+          case prefix (get-or (string-join "" ["xmlns:" prefix]) "" attrs)
+
+; The dialect a root element names, as the reader detects it: Atom 0.3
+; or 1.0 for a `feed`, RSS for an `rss`, RSS 1.0 for an `RDF`. Any other
+; root is the reader's own refusal, made here before anything is written.
+def feed-transduce-dialect [name local attrs]
+  match local
+    case "feed"
+      match (feed-transduce-namespace name attrs)
+        case feed-transduce-atom03 "atom03"
+        case _ "atom10"
+    case "rss" "rss"
+    case "RDF" "rdf"
+    case _ (fail :invalid (string-join "" ["feed: unrecognized root element \"" local "\"; expected one of feed, rss, RDF"]))
+
+; ---------------------------------------------------------------------
+; The reading: the rule passes in, the units out
+; ---------------------------------------------------------------------
+
+def feed-transduce-mark [frame stack]
+  push frame (pop stack)
+
+; The events that begin an element's summary: its local name, its
+; attributes in order, and the list `c` of what it holds or `x` of the
+; pieces of its markup.
+def feed-transduce-begin [local attrs list]
+  flatten
+    vector
+      [object-start (key "l") (scalar local) (key "a") object-start]
+      flatten (map (fn [k] [(key k) (scalar (get k attrs))]) (keys attrs))
+      [object-end (key list) array-start]
+
+; An attribute's value as the reader serialises it: &, ", < and >
+; escaped, in that order.
+def feed-transduce-escape [value]
+  string-join "&gt;" (split ">" (string-join "&lt;" (split "<" (string-join "&quot;" (split "\"" (string-join "&amp;" (split "&" value)))))))
+
+; A serialised element's start tag, but for the `>` or `/>` that ends it.
+def feed-transduce-start-tag [name attrs]
+  string-join "" (push-all (map (fn [k] (string-join "" [" " k "=\"" (feed-transduce-escape (get k attrs)) "\""])) (keys attrs)) ["<" name])
+
+; Whether an element is an Atom text construct or content of type xhtml.
+def feed-transduce-xhtml [dialect local attrs]
+  match dialect
+    case "atom10" (if (feed-transduce-among feed-transduce-constructs local) (equal (get "type" attrs) "xhtml") false)
+    case "atom03" (if (feed-transduce-among feed-transduce-constructs local) (equal (get "type" attrs) "xhtml") false)
+    case _ false
+
+def feed-transduce-skip [dialect stack]
+  transition [dialect (push [:skip] stack)] []
+
+; A member of the feed: a unit `m` of its own.
+def feed-transduce-member [dialect stack local attrs]
+  if (feed-transduce-xhtml dialect local attrs)
+    transition [dialect (push [:xh true false] stack)] (push-all (feed-transduce-begin local attrs "x") [object-start (key "m")])
+    transition [dialect (push [:node :leaf true] stack)] (push-all (feed-transduce-begin local attrs "c") [object-start (key "m")])
+
+; An element of the feed's own level: an entry, a unit `e` of its own, a
+; member of the feed, or nothing the reader reads.
+def feed-transduce-unit [dialect stack members entry local attrs]
+  if (equal local entry)
+    transition [dialect (push [:node :sub true] stack)] (push-all (feed-transduce-begin local attrs "c") [object-start (key "e")])
+    if (feed-transduce-among members local)
+      feed-transduce-member dialect stack local attrs
+      feed-transduce-skip dialect stack
+
+; A child of the root: in RSS, the first channel, `ch`, after which
+; nothing else of the root is read.
+def feed-transduce-top [dialect stack chan local attrs]
+  match dialect
+    case "rss"
+      match [chan local]
+        case [:done _] (feed-transduce-skip dialect stack)
+        case [_ "channel"] (transition [dialect (push [:channel] stack)] [object-start (key "ch") (scalar true) object-end])
+        case _ (feed-transduce-unit dialect stack feed-transduce-rss-members "item" local attrs)
+    case "rdf" (feed-transduce-unit dialect stack feed-transduce-rdf-members "item" local attrs)
+    case "atom10" (feed-transduce-unit dialect stack feed-transduce-atom10-members "entry" local attrs)
+    case "atom03" (feed-transduce-unit dialect stack feed-transduce-atom03-members "entry" local attrs)
+
+; A child of an element whose summary is being written.
+def feed-transduce-nested [dialect stack kids local attrs]
+  match kids
+    case :sub
+      if (feed-transduce-xhtml dialect local attrs)
+        transition [dialect (push [:xh false false] stack)] (feed-transduce-begin local attrs "x")
+        transition [dialect (push [:node :leaf false] stack)] (feed-transduce-begin local attrs "c")
+    case :leaf (transition [dialect (push [:node :skip false] stack)] (feed-transduce-begin local attrs "c"))
+    case :skip (feed-transduce-skip dialect stack)
+
+; Content begins in a serialised element: its start tag's `>`, once, and
+; in the first div, the mark where its inner markup begins.
+def feed-transduce-content [stack name opened first]
+  if opened
+    [stack []]
+    [(feed-transduce-mark [:ser name true first] stack) (if first [(scalar ">") (scalar true)] [(scalar ">")])]
+
+; A child element of an xhtml construct: the first div is marked.
+def feed-transduce-xh-child [dialect stack unit div name local attrs]
+  if (if div false (equal local "div"))
+    transition [dialect (push [:ser name false true] (feed-transduce-mark [:xh unit true] stack))] [(scalar (feed-transduce-start-tag name attrs))]
+    transition [dialect (push [:ser name false false] stack)] [(scalar (feed-transduce-start-tag name attrs))]
+
+def feed-transduce-ser-child [dialect stack n opened first name attrs]
+  match (feed-transduce-content stack n opened first)
+    case [rest outputs] (transition [dialect (push [:ser name false false] rest)] (push (scalar (feed-transduce-start-tag name attrs)) outputs))
+
+; An element's start.
+def feed-transduce-element [dialect stack tag]
+  let [name (get "name" tag) attrs (get "attributes" tag) local (feed-transduce-local name)]
+    match (count stack)
+      case 0
+        let [found (feed-transduce-dialect name local attrs)]
+          transition [found [[:root :none]]] [array-start object-start (key "start") (scalar found) object-end]
+      case _
+        match (top stack)
+          case [:root chan] (feed-transduce-top dialect stack chan local attrs)
+          case [:channel] (feed-transduce-unit dialect stack feed-transduce-rss-members "item" local attrs)
+          case [:skip] (feed-transduce-skip dialect stack)
+          case [:node kids unit] (feed-transduce-nested dialect stack kids local attrs)
+          case [:xh unit div] (feed-transduce-xh-child dialect stack unit div name local attrs)
+          case [:ser n opened first] (feed-transduce-ser-child dialect stack n opened first name attrs)
+
+; A text: what an element whose summary is written holds, or a piece of
+; the markup. An empty text changes neither.
+def feed-transduce-text [state dialect stack text]
+  match [text (count stack)]
+    case ["" _] (transition state [])
+    case [_ 0] (transition state [])
+    case _
+      match (top stack)
+        case [:node kids unit] (transition state [(scalar text)])
+        case [:xh unit div] (transition state [(scalar text)])
+        case [:ser n opened first]
+          match (feed-transduce-content stack n opened first)
+            case [rest outputs] (transition [dialect rest] (push (scalar text) outputs))
+        case _ (transition state [])
+
+; An element's end.
+def feed-transduce-end [dialect stack]
+  match (count stack)
+    case 0 (fail :protocol-order "an element closed with none open, which a document's never do")
+    case _
+      let [rest (pop stack)]
+        match (top stack)
+          case [:root chan] (transition [dialect rest] [array-end])
+          case [:channel] (transition [dialect (feed-transduce-mark [:root :done] rest)] [])
+          case [:skip] (transition [dialect rest] [])
+          case [:node kids true] (transition [dialect rest] [array-end object-end object-end])
+          case [:node kids false] (transition [dialect rest] [array-end object-end])
+          case [:xh true div] (transition [dialect rest] [array-end object-end object-end])
+          case [:xh false div] (transition [dialect rest] [array-end object-end])
+          case [:ser n true true] (transition [dialect rest] [(scalar false) (scalar (string-join "" ["</" n ">"]))])
+          case [:ser n true false] (transition [dialect rest] [(scalar (string-join "" ["</" n ">"]))])
+          case [:ser n false true] (transition [dialect rest] [(scalar true) (scalar false) (scalar "/>")])
+          case [:ser n false false] (transition [dialect rest] [(scalar "/>")])
+
+def feed-transduce-read [state pass]
+  match state
+    case [dialect stack]
+      match pass
+        case (open rule)
+          match (get :name rule)
+            case "element"
+              match (transduce-token 0 rule)
+                case missing (transition state [])
+                case token (feed-transduce-element dialect stack (get :val token))
+            case "child"
+              match (transduce-token 0 rule)
+                case missing (transition state [])
+                case token (feed-transduce-text state dialect stack (get :val token))
+            case _ (transition state [])
+        case (close rule)
+          match (get :name rule)
+            case "element" (feed-transduce-end dialect stack)
+            case _ (transition state [])
+
+def feed-transduce-read-finish [state]
+  match state
+    case ["" []] (fail :protocol-order "the rule passes ended with no root element, which a document's never do")
+    case [dialect []] []
+    case _ (fail :protocol-order "the rule passes ended inside an element, which a document's never do")
+
+; ---------------------------------------------------------------------
+; Values: what the reader makes of an element's summary
+; ---------------------------------------------------------------------
+
+; What an element holds, its texts and its elements in order.
+def feed-transduce-holds [el]
+  get-or "c" [] el
+
+; Every element `els` holds whose local name is `name`, and the first.
+def feed-transduce-all [name els]
+  filter (fn [c] (match (kind c) (case :record (equal (get "l" c) name)) (case _ false))) els
+
+def feed-transduce-find [name els]
+  get-path (path 0) (feed-transduce-all name els)
+
+; An element's own text, trimmed: the reader's textOf, "" for none.
+def feed-transduce-text-of [el]
+  trim (string-join "" (filter (fn [c] (match (kind c) (case :string true) (case _ false))) (feed-transduce-holds el)))
+
+; An attribute's value, or missing; and the same, missing for "" too,
+; the reader's `if (a.x)`.
+def feed-transduce-attr [name el]
+  get name (get-or "a" (record) el)
+
+def feed-transduce-truthy [name el]
+  match (feed-transduce-attr name el)
+    case "" missing
+    case value value
+
+; A member, `name` and the events of its value; none for no events.
+def feed-transduce-pair [name events]
+  match events
+    case [] []
+    case _ (push-all events [(key name)])
+
+; A member whose value is text: none for missing.
+def feed-transduce-string [name value]
+  match value
+    case missing []
+    case _ [(key name) (scalar value)]
+
+; A member whose value is text the reader keeps only where it is not
+; empty.
+def feed-transduce-some [name value]
+  match value
+    case "" []
+    case _ [(key name) (scalar value)]
+
+; A list member, its items' events; none for no items.
+def feed-transduce-list [name items]
+  match items
+    case [] []
+    case _ (flatten [[(key name) array-start] (flatten items) [array-end]])
+
+; A text construct of a type and a value.
+def feed-transduce-typed [type value]
+  [object-start (key "type") (scalar type) (key "value") (scalar value) object-end]
+
+; ---------------------------------------------------------------------
+; Numbers: parseInt(text, 10), as the reader reads a link's length
+; ---------------------------------------------------------------------
+
+def feed-transduce-digits [[48 57]]
+
+; The text with each ASCII digit written as a zero.
+def feed-transduce-zeros [text]
+  string-join "0" (split "1" (string-join "0" (split "2" (string-join "0" (split "3" (string-join "0" (split "4" (string-join "0" (split "5" (string-join "0" (split "6" (string-join "0" (split "7" (string-join "0" (split "8" (string-join "0" (split "9" text)))))))))))))))))
+
+def feed-transduce-nonempty [parts]
+  get-path (path 0) (filter (fn [p] (match p (case "" false) (case _ true))) parts)
+
+; The run of ASCII digits a text begins with, "" for none: with its
+; digits as zeros, the text splits at them into what is not a digit, and
+; the first such run that is not empty follows the digits it begins with.
+def feed-transduce-run [text]
+  if (chars-within feed-transduce-digits text)
+    text
+    get-path (path 0) (first-split (feed-transduce-nonempty (split "0" (feed-transduce-zeros text))) text)
+
+; A run of digits without the zeros it begins with, "0" for zeros alone.
+def feed-transduce-unpad [run]
+  if (chars-within [[48 48]] run)
+    "0"
+    let [lead (feed-transduce-nonempty (split "0" run))]
+      string-join "" [lead (get-path (path 1) (first-split lead run))]
+
+def feed-transduce-signed [sign text]
+  match (feed-transduce-run text)
+    case "" (number "NaN")
+    case run (number (string-join "" [sign (feed-transduce-unpad run)]))
+
+; parseInt(text, 10): white space skipped, a sign, and the longest run of
+; ASCII digits after it, as a number; NaN where there is no digit.
+def feed-transduce-int [text]
+  let [t (trim text)]
+    if (starts-with "-" t)
+      feed-transduce-signed "-" (get-path (path 1) (first-split "-" t))
+      if (starts-with "+" t)
+        feed-transduce-signed "" (get-path (path 1) (first-split "+" t))
+        feed-transduce-signed "" t
+
+; A link's length: the number parseInt reads, or, where the feed's
+; members are compared (`exact` false), the text it is read from, since
+; NaN equals nothing.
+def feed-transduce-length [exact el]
+  match (feed-transduce-truthy "length" el)
+    case missing []
+    case text (if exact [(key "length") (scalar (feed-transduce-int text))] [(key "length") (scalar text)])
+
+; ---------------------------------------------------------------------
+; Atom 1.0 and 0.3
+; ---------------------------------------------------------------------
+
+; An xhtml construct's markup, as the reader serialises it: the inner
+; markup of its first div, between the two marks, where it has one, and
+; all of it otherwise.
+def feed-transduce-pieces [x is]
+  string-join "" (filter (fn [p] (match (kind p) (case :string true) (case _ false))) (map (fn [i] (get-path (path i) x)) is))
+
+def feed-transduce-markup [el]
+  let [x (get-or "x" [] el) marks (filter (fn [i] (match (kind (get-path (path i) x)) (case :boolean true) (case _ false))) (indices x))]
+    match marks
+      case [] (feed-transduce-pieces x (indices x))
+      case [b e] (feed-transduce-pieces x (filter (fn [i] (match [(compare i b) (compare i e)] (case [:greater :less] true) (case _ false))) (indices x)))
+      case _ (fail :protocol-order "an xhtml construct holds more than one first div")
+
+; A text construct, the reader's parseText: its type, text where the
+; attribute names none, and its value, its text or its markup.
+def feed-transduce-type [el]
+  match (feed-transduce-truthy "type" el)
+    case missing "text"
+    case type type
+
+def feed-transduce-value [type el]
+  match type
+    case "xhtml" (feed-transduce-markup el)
+    case _ (feed-transduce-text-of el)
+
+def feed-transduce-construct [name el]
+  match el
+    case missing []
+    case _
+      let [type (feed-transduce-type el)]
+        feed-transduce-pair name (feed-transduce-typed type (feed-transduce-value type el))
+
+; A content, the reader's parseContent: its type, its src where it has
+; one, and its value.
+def feed-transduce-content-of [el]
+  match el
+    case missing []
+    case _
+      let [type (feed-transduce-type el)]
+        flatten
+          vector
+            [(key "content") object-start (key "type") (scalar type)]
+            feed-transduce-string "src" (feed-transduce-truthy "src" el)
+            [(key "value") (scalar (feed-transduce-value type el)) object-end]
+
+; A member whose value is an element's text, where the element is.
+def feed-transduce-element-text [name el]
+  match el
+    case missing []
+    case _ [(key name) (scalar (feed-transduce-text-of el))]
+
+; A person, the reader's parsePerson: its name's text, its uri (or url)
+; and its email where they have text.
+def feed-transduce-person [el]
+  let [holds (feed-transduce-holds el)
+       uri (feed-transduce-text-of (feed-transduce-find "uri" holds))
+       url (feed-transduce-text-of (feed-transduce-find "url" holds))]
+    flatten
+      vector
+        [object-start (key "name") (scalar (feed-transduce-text-of (feed-transduce-find "name" holds)))]
+        feed-transduce-some "uri" (match uri (case "" url) (case _ uri))
+        feed-transduce-some "email" (feed-transduce-text-of (feed-transduce-find "email" holds))
+        [object-end]
+
+; A link, the reader's parseLink.
+def feed-transduce-link [exact el]
+  flatten
+    vector
+      [object-start (key "href") (scalar (match (feed-transduce-attr "href" el) (case missing "") (case href href)))]
+      feed-transduce-string "rel" (feed-transduce-truthy "rel" el)
+      feed-transduce-string "type" (feed-transduce-truthy "type" el)
+      feed-transduce-string "hreflang" (feed-transduce-truthy "hreflang" el)
+      feed-transduce-string "title" (feed-transduce-truthy "title" el)
+      feed-transduce-length exact el
+      [object-end]
+
+; A category, the reader's parseCategory: its term, or its text, and its
+; scheme and label where the attributes are, empty or not.
+def feed-transduce-category [el]
+  flatten
+    vector
+      [object-start (key "term") (scalar (match (feed-transduce-truthy "term" el) (case missing (feed-transduce-text-of el)) (case term term)))]
+      feed-transduce-string "scheme" (feed-transduce-attr "scheme" el)
+      feed-transduce-string "label" (feed-transduce-attr "label" el)
+      [object-end]
+
+; A generator, the reader's parseGenerator.
+def feed-transduce-generator [el]
+  match el
+    case missing []
+    case _
+      flatten
+        vector
+          [(key "generator") object-start]
+          feed-transduce-string "uri" (feed-transduce-attr "uri" el)
+          feed-transduce-string "version" (feed-transduce-attr "version" el)
+          [(key "value") (scalar (feed-transduce-text-of el)) object-end]
+
+; The members of an Atom feed but its format, version and entries, from
+; the elements of its own level held so far.
+def feed-transduce-atom-head [atom03 exact els]
+  flatten
+    vector
+      feed-transduce-element-text "id" (feed-transduce-find "id" els)
+      feed-transduce-construct "title" (feed-transduce-find "title" els)
+      feed-transduce-element-text "updated" (feed-transduce-find (if atom03 "modified" "updated") els)
+      feed-transduce-list "authors" (map feed-transduce-person (feed-transduce-all "author" els))
+      feed-transduce-list "contributors" (map feed-transduce-person (feed-transduce-all "contributor" els))
+      feed-transduce-list "categories" (map feed-transduce-category (feed-transduce-all "category" els))
+      feed-transduce-list "links" (map (partial feed-transduce-link exact) (feed-transduce-all "link" els))
+      feed-transduce-generator (feed-transduce-find "generator" els)
+      feed-transduce-element-text "icon" (feed-transduce-find "icon" els)
+      feed-transduce-element-text "logo" (feed-transduce-find "logo" els)
+      feed-transduce-construct "rights" (feed-transduce-find (if atom03 "copyright" "rights") els)
+      feed-transduce-construct "subtitle" (feed-transduce-find (if atom03 "tagline" "subtitle") els)
+
+; An Atom entry, the reader's parseAtomEntry.
+def feed-transduce-atom-entry [atom03 el]
+  let [els (feed-transduce-holds el)]
+    flatten
+      vector
+        [object-start]
+        feed-transduce-element-text "id" (feed-transduce-find "id" els)
+        feed-transduce-construct "title" (feed-transduce-find "title" els)
+        feed-transduce-element-text "updated" (feed-transduce-find (if atom03 "modified" "updated") els)
+        feed-transduce-element-text "published" (feed-transduce-find (if atom03 "issued" "published") els)
+        feed-transduce-list "authors" (map feed-transduce-person (feed-transduce-all "author" els))
+        feed-transduce-list "contributors" (map feed-transduce-person (feed-transduce-all "contributor" els))
+        feed-transduce-list "categories" (map feed-transduce-category (feed-transduce-all "category" els))
+        feed-transduce-list "links" (map (partial feed-transduce-link true) (feed-transduce-all "link" els))
+        feed-transduce-content-of (feed-transduce-find "content" els)
+        feed-transduce-construct "rights" (feed-transduce-find (if atom03 "copyright" "rights") els)
+        feed-transduce-construct "summary" (feed-transduce-find (if atom03 "tagline" "summary") els)
+        [object-end]
+
+; ---------------------------------------------------------------------
+; RSS: an author, managingEditor or webMaster as an Atom person
+; ---------------------------------------------------------------------
+
+; The white space of JavaScript's \s, which `trim` takes off too.
+def feed-transduce-spaces ["\t" "\n" "\u000b" "\u000c" "\r" " " " " " " " " " " " " " " " " " " " " " " " " " " " " " " " " " " " " "　" "﻿"]
+
+; The text up to its first white space: each white space character cuts
+; a prefix of the text, and the shortest prefix sorts first.
+def feed-transduce-word [text]
+  get-path (path 0) (sort (map (fn [c] (get-path (path 0) (first-split c text))) feed-transduce-spaces))
+
+; The text through the first @ after its first character, within its
+; part before any white space or parenthesis: the shortest X@ the
+; pattern's [^\s()]+@ matches; missing where there is none.
+def feed-transduce-at [word]
+  let [parts (split "@" (get-path (path 0) (first-split "(" (get-path (path 0) (first-split ")" word)))))]
+    match [(count parts) (get-path (path 0) parts)]
+      case [1 _] missing
+      case [2 ""] missing
+      case [_ ""] (string-join "" ["@" (get-path (path 1) parts) "@"])
+      case [_ x] (string-join "" [x "@"])
+
+; Whether a is longer than b.
+def feed-transduce-longer [a b]
+  match (compare (length a) (length b))
+    case :greater true
+    case _ false
+
+; The name of `(name)`, the rest of the text after an address: missing
+; unless it opens with ( and its one ) ends it, with something between.
+def feed-transduce-parenthesised [rest]
+  if (starts-with "(" rest)
+    feed-transduce-closing (get-path (path 1) (first-split "(" rest))
+    missing
+
+; The name before a closing ) that is the text's only one and its last
+; character, where it is not empty.
+def feed-transduce-closing [inner]
+  let [parts (split ")" inner)]
+    match parts
+      case [name ""] (match name (case "" missing) (case _ name))
+      case _ missing
+
+; An RSS person, the reader's parseRssPerson: its text matched against
+; /^\s*([^\s()]+@\S+)\s*(?:\(([^)]+)\))?\s*$/ as JavaScript's engine
+; matches it, the address its email and the name in parentheses its name
+; (the address where there is none), and the text its name where the
+; pattern does not match. The text is trimmed, so an address is its first
+; word, or, where that word holds a ( after the address's first character
+; past its @, its part before the last such (.
+def feed-transduce-rss-person [text]
+  let [word (feed-transduce-word text) at (feed-transduce-at word)]
+    match at
+      case missing (feed-transduce-named text missing)
+      case _
+        if (equal word text)
+          if (feed-transduce-longer text at)
+            feed-transduce-named text text
+            feed-transduce-named text missing
+          feed-transduce-spaced text word at
+
+; A text holding white space: the address its first word, followed by
+; white space and a parenthesised name; or the first word's part before
+; its last (, the rest of the text from there the parenthesised name.
+def feed-transduce-spaced [text word at]
+  let [rest (get-path (path 1) (first-split word text))
+       whole (if (feed-transduce-longer word at) (feed-transduce-parenthesised (trim rest)) missing)]
+    match whole
+      case missing (feed-transduce-cut text word at rest)
+      case name (feed-transduce-named name word)
+
+def feed-transduce-cut [text word at rest]
+  let [parts (split "(" word)]
+    match (count parts)
+      case 1 (feed-transduce-named text missing)
+      case _
+        let [address (string-join "(" (pop parts))]
+          if (feed-transduce-longer address at)
+            match (feed-transduce-closing (string-join "" [(top parts) rest]))
+              case missing (feed-transduce-named text missing)
+              case name (feed-transduce-named name address)
+            feed-transduce-named text missing
+
+; A person of a name and, where there is one, an email.
+def feed-transduce-named [name email]
+  match email
+    case missing [object-start (key "name") (scalar name) object-end]
+    case _ [object-start (key "name") (scalar name) (key "email") (scalar email) object-end]
+
+; ---------------------------------------------------------------------
+; RSS 2.0, 0.92 and 0.91, as the reader maps them onto Atom
+; ---------------------------------------------------------------------
+
+; A text construct of type text, where its value is not empty.
+def feed-transduce-rss-text [name value]
+  match value
+    case "" []
+    case _ (push-all (feed-transduce-typed "text" value) [(key name)])
+
+; A link of an href and a rel, where the href is not empty.
+def feed-transduce-rel [href rel]
+  match href
+    case "" []
+    case _ [[object-start (key "href") (scalar href) (key "rel") (scalar rel) object-end]]
+
+; An RSS category as an Atom one: its text the term, its domain, where
+; the attribute is, the scheme.
+def feed-transduce-rss-category [el]
+  flatten
+    vector
+      [object-start (key "term") (scalar (feed-transduce-text-of el))]
+      feed-transduce-string "scheme" (feed-transduce-attr "domain" el)
+      [object-end]
+
+; A list of one person, where the text is not empty.
+def feed-transduce-rss-people [text]
+  match text
+    case "" []
+    case _ (flatten [[(key "authors") array-start] (feed-transduce-rss-person text) [array-end]])
+
+; The members of the feed an RSS channel maps onto, from the elements of
+; its own level held so far: the channel's, or the root's where the root
+; has no channel.
+def feed-transduce-rss-head [els]
+  let [link (feed-transduce-text-of (feed-transduce-find "link" els))
+       built (feed-transduce-text-of (feed-transduce-find "lastBuildDate" els))
+       generator (feed-transduce-text-of (feed-transduce-find "generator" els))
+       editor (feed-transduce-text-of (feed-transduce-find "managingEditor" els))]
+    flatten
+      vector
+        feed-transduce-rss-text "title" (feed-transduce-text-of (feed-transduce-find "title" els))
+        feed-transduce-rss-text "subtitle" (feed-transduce-text-of (feed-transduce-find "description" els))
+        feed-transduce-rss-text "rights" (feed-transduce-text-of (feed-transduce-find "copyright" els))
+        feed-transduce-some "id" link
+        feed-transduce-some "updated" (match built (case "" (feed-transduce-text-of (feed-transduce-find "pubDate" els))) (case _ built))
+        match generator
+          case "" []
+          case _ [(key "generator") object-start (key "value") (scalar generator) object-end]
+        feed-transduce-some "logo" (feed-transduce-text-of (feed-transduce-find "url" (feed-transduce-holds (feed-transduce-find "image" els))))
+        feed-transduce-list "links" (feed-transduce-rel link "alternate")
+        feed-transduce-list "categories" (map feed-transduce-rss-category (feed-transduce-all "category" els))
+        feed-transduce-rss-people (match editor (case "" (feed-transduce-text-of (feed-transduce-find "webMaster" els))) (case _ editor))
+
+; An item's enclosure as a link, where it has a url.
+def feed-transduce-enclosure [el]
+  match (feed-transduce-truthy "url" el)
+    case missing []
+    case url
+      vector
+        flatten
+          vector
+            [object-start (key "href") (scalar url) (key "rel") (scalar "enclosure")]
+            feed-transduce-string "type" (feed-transduce-truthy "type" el)
+            feed-transduce-length true el
+            [object-end]
+
+; An item's comments as a link, where they have text.
+def feed-transduce-replies [comments]
+  match comments
+    case "" []
+    case _ [[object-start (key "href") (scalar comments) (key "rel") (scalar "replies") (key "type") (scalar "text/html") object-end]]
+
+; An item's source as an Atom source.
+def feed-transduce-source [el]
+  match el
+    case missing []
+    case _
+      flatten
+        vector
+          [(key "source") object-start (key "format") (scalar "atom") (key "version") (scalar "1.0")]
+          feed-transduce-rss-text "title" (feed-transduce-text-of el)
+          match (feed-transduce-truthy "url" el)
+            case missing []
+            case url (feed-transduce-list "links" (feed-transduce-rel url "self"))
+          [object-end]
+
+; An RSS item as an Atom entry, the reader's rss2ItemToAtomEntry.
+def feed-transduce-rss-entry [el]
+  let [els (feed-transduce-holds el)
+       link (feed-transduce-text-of (feed-transduce-find "link" els))
+       description (feed-transduce-text-of (feed-transduce-find "description" els))
+       published (feed-transduce-text-of (feed-transduce-find "pubDate" els))
+       guid (feed-transduce-find "guid" els)]
+    flatten
+      vector
+        [object-start]
+        feed-transduce-rss-text "title" (feed-transduce-text-of (feed-transduce-find "title" els))
+        match description
+          case "" []
+          case _ (push-all (feed-transduce-typed "html" description) [(key "summary")])
+        match published
+          case "" []
+          case _ [(key "published") (scalar published) (key "updated") (scalar published)]
+        match guid
+          case missing (feed-transduce-some "id" link)
+          case _ [(key "id") (scalar (feed-transduce-text-of guid))]
+        feed-transduce-list "links" (flatten [(feed-transduce-rel link "alternate") (feed-transduce-enclosure (feed-transduce-find "enclosure" els)) (feed-transduce-replies (feed-transduce-text-of (feed-transduce-find "comments" els)))])
+        feed-transduce-rss-people (feed-transduce-text-of (feed-transduce-find "author" els))
+        feed-transduce-list "categories" (map feed-transduce-rss-category (feed-transduce-all "category" els))
+        feed-transduce-source (feed-transduce-find "source" els)
+        [object-end]
+
+; ---------------------------------------------------------------------
+; RSS 1.0 and 0.90, as the reader maps them onto Atom
+; ---------------------------------------------------------------------
+
+; The members of the feed an RSS 1.0 document maps onto, from its first
+; channel and its first image.
+def feed-transduce-rdf-head [els]
+  let [channel (feed-transduce-find "channel" els)
+       holds (feed-transduce-holds channel)
+       link (feed-transduce-text-of (feed-transduce-find "link" holds))
+       about (match (feed-transduce-truthy "rdf:about" channel) (case missing "") (case about about))]
+    flatten
+      vector
+        feed-transduce-rss-text "title" (feed-transduce-text-of (feed-transduce-find "title" holds))
+        feed-transduce-rss-text "subtitle" (feed-transduce-text-of (feed-transduce-find "description" holds))
+        feed-transduce-some "id" (match about (case "" link) (case _ about))
+        feed-transduce-list "links" (feed-transduce-rel link "alternate")
+        feed-transduce-some "logo" (feed-transduce-text-of (feed-transduce-find "url" (feed-transduce-holds (feed-transduce-find "image" els))))
+
+; An RSS 1.0 item as an Atom entry: its id its rdf:about, or its link.
+def feed-transduce-rdf-entry [el]
+  let [els (feed-transduce-holds el)
+       link (feed-transduce-text-of (feed-transduce-find "link" els))]
+    flatten
+      vector
+        [object-start]
+        feed-transduce-rss-text "title" (feed-transduce-text-of (feed-transduce-find "title" els))
+        feed-transduce-rss-text "summary" (feed-transduce-text-of (feed-transduce-find "description" els))
+        [(key "id") (scalar (match (feed-transduce-truthy "rdf:about" el) (case missing link) (case about about)))]
+        feed-transduce-list "links" (feed-transduce-rel link "alternate")
+        [object-end]
+
+; ---------------------------------------------------------------------
+; The writing: the units in, the feed's events out
+; ---------------------------------------------------------------------
+
+def feed-transduce-captures
+  vector
+    capture :start (path each-index "start") :max_metadata_bytes
+    capture :channel (path each-index "ch") :max_metadata_bytes
+    capture :member (path each-index "m") :max_metadata_bytes
+    capture :entry (path each-index "e") :max_record_bytes
+
+; The feed's members but its format, version and entries.
+def feed-transduce-head [dialect exact els]
+  match dialect
+    case "atom10" (feed-transduce-atom-head false exact els)
+    case "atom03" (feed-transduce-atom-head true exact els)
+    case "rss" (feed-transduce-rss-head els)
+    case "rdf" (feed-transduce-rdf-head els)
+
+def feed-transduce-entry [dialect el]
+  match dialect
+    case "atom10" (feed-transduce-atom-entry false el)
+    case "atom03" (feed-transduce-atom-entry true el)
+    case "rss" (feed-transduce-rss-entry el)
+    case "rdf" (feed-transduce-rdf-entry el)
+
+; A member of the feed after its first entry: nothing, where the feed's
+; members are what was written; refused otherwise.
+def feed-transduce-late [dialect els el]
+  let [more (push el els)]
+    if (equal (feed-transduce-head dialect false els) (feed-transduce-head dialect false more))
+      transition [:body dialect more] []
+      fail :unstreamable (string-join "" ["a feed's " (get "l" el) " element after its first entry, which changes the feed's members, written before its entries"])
+
+def feed-transduce-write [state item]
+  match [state item]
+    case [[:start] (selected :start dialect)] (transition [:head dialect []] [object-start (key "format") (scalar "atom") (key "version") (scalar (match dialect (case "atom03" "0.3") (case _ "1.0")))])
+    case [[:head dialect els] (selected :member el)] (transition [:head dialect (push el els)] [])
+    case [[:head dialect els] (selected :channel _)] (transition [:head dialect []] [])
+    case [[:head dialect els] (selected :entry el)] (transition [:body dialect els] (flatten [(feed-transduce-head dialect true els) [(key "entries") array-start] (feed-transduce-entry dialect el)]))
+    case [[:body dialect els] (selected :member el)] (feed-transduce-late dialect els el)
+    case [[:body dialect els] (selected :channel _)] (fail :unstreamable "a channel after an item of the rss element, from which the reader reads the feed and its items in place of the rss element's")
+    case [[:body dialect els] (selected :entry el)] (transition state (feed-transduce-entry dialect el))
+    case _ (fail :protocol-order "the units of a feed came out of order, which the reading never makes")
+
+def feed-transduce-done [state]
+  match state
+    case [:head dialect els] (flatten [(feed-transduce-head dialect true els) [(key "entries") array-start array-end object-end]])
+    case [:body dialect els] [array-end object-end]
+    case _ (fail :protocol-order "the units of a feed held no root element, which the reading never makes")
+
+; The transducer: a feed's rule passes in, its tree's events out.
+def feed-transduce [input]
+  as-events
+    scan-emit [:start] feed-transduce-write feed-transduce-done
+      route feed-transduce-captures
+        as-events (scan-emit ["" []] feed-transduce-read feed-transduce-read-finish (parser-events input))
