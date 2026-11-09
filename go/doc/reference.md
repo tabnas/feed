@@ -14,6 +14,7 @@ Import path: `github.com/tabnas/feed/go`, package name `feed`.
 | Symbol                                | Kind     | Description                                  |
 | ------------------------------------- | -------- | -------------------------------------------- |
 | `Feed(j *tabnas.Tabnas, opts map[string]any) error` | func | Plugin entry point; register with `UseDefaults`. |
+| `Make(opts ...map[string]any) (*tabnas.Tabnas, error)` | func | A feed parser that reads a reader a window at a time. |
 | `Defaults`                            | `map[string]any` | `{"format": "atom", "strictNamespaces": true}`, merged with caller options. |
 | `Detect(root any) Detection`          | func     | Report dialect/version of a raw XML root.    |
 | `Convert(root any, format string) (any, error)` | func | Turn a raw element tree into the requested shape. |
@@ -43,6 +44,25 @@ precedence. Pass no extra map for defaults-only. `Feed` calls
 installed for you; you still need `github.com/tabnas/xml/go` as a
 dependency. `Feed` is idempotent: it short-circuits if already applied
 to the instance.
+
+`Make(opts...)` builds the same parser as `tabnas.Make()` then
+`UseDefaults(Feed, Defaults, opts)`, and declares the engine's
+`Lex.Window` option on it, so that the engine's `ParseReader` reads a
+feed from a reader a window at a time, the text from the oldest token
+the parser holds to some 64 KiB past the cursor, rather than whole. The
+tokens are the XML plugin's, whose matcher reads the text only through
+that window from `github.com/tabnas/xml/go` v0.7.20, and the conversion
+reads the finished tree only. The value and the errors are those of
+`Parse` of the same text, but for an error's excerpt of a very long
+line.
+
+```go
+j, err := tabnasfeed.Make()
+if err != nil {
+	// a bug in this package, or options the plugin refuses
+}
+result, err := j.ParseReader(file) // any io.Reader
+```
 
 ## Options
 

@@ -8,11 +8,12 @@ guide](guide.md); for rationale see [concepts](concepts.md).
 
 ## Exports
 
-`@tabnas/feed` exports two values plus one function and a set of types:
+`@tabnas/feed` exports two values, two functions and a set of types:
 
 | Export    | Kind     | Description                                       |
 | --------- | -------- | ------------------------------------------------- |
 | `Feed`    | `Plugin` | The plugin to register on a `Tabnas` engine.      |
+| `make`    | function | `make(options?) => Tabnas`: a feed parser that reads a reader a window at a time. |
 | `detect`  | function | `detect(root: XmlElement) => { dialect, version }`. |
 | `VERSION` | `string` | Package version; always equal to `package.json` "version". |
 
@@ -43,6 +44,24 @@ No other plugin has to come first (the XML grammar installs its own
 lexer). `Feed` calls `tn.use(Xml)` internally, so you do **not** have
 to register `@tabnas/xml` yourself, though installing it as a
 dependency is required.
+
+`make(options?)` builds the same parser as `new Tabnas().use(Feed,
+options)` and declares the engine's `lex.window` option on it, so that
+the engine's `parseReader` reads a feed from a reader a window at a
+time, the text from the oldest token the parser holds to some 64 KiB
+past the cursor, rather than whole. The tokens are the XML plugin's,
+whose matcher reads the text only through that window from
+`@tabnas/xml` 0.7.20, and the conversion reads the finished tree only.
+The value and the errors are those of `parse` of the same text, but for
+an error's excerpt of a very long line, which shows the line only as far
+back as the window reaches.
+
+```js
+const { make } = require('@tabnas/feed')
+
+const feed = make().parse('<rss version="2.0"><channel><title>T</title></channel></rss>')
+feed.title // => { type: 'text', value: 'T' }
+```
 
 ## Options
 
