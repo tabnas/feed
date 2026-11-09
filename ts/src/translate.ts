@@ -1876,8 +1876,10 @@ def feed-render [input]
 ; is written and whether it is the first div; and [:skip] for an element
 ; the reader does not read. The writing's state is [:start], then [:head
 ; dialect els] while the members are held, \`els\` the members' units, and
-; [:body dialect els] once they are written. Nothing grows with a
-; document's length but the members held, under max_metadata_bytes.
+; [:body dialect els] once they are written, after which \`els\` gains an
+; element only of a name it has none of. Nothing grows with a document's
+; length but the members held before its first entry, under
+; max_metadata_bytes.
 
 ; ---------------------------------------------------------------------
 ; Names
@@ -2626,11 +2628,19 @@ def feed-transduce-entry [dialect el]
     case "rdf" (feed-transduce-rdf-entry el)
 
 ; A member of the feed after its first entry: nothing, where the feed's
-; members are what was written; refused otherwise.
-def feed-transduce-late [dialect els el]
+; members are what was written; refused otherwise. One that changes
+; nothing is held only where no element of its name is: the reader reads
+; the first element of a name, which an empty one can be (an empty title
+; leaves a later title unread), and any later one changes nothing a later
+; check reads, since a list's element always changes the members. So
+; what is held after the entries begin grows by an element of each name
+; at most, never with the document's length.
+def feed-transduce-late [state dialect els el]
   let [more (push el els)]
     if (equal (feed-transduce-head dialect false els) (feed-transduce-head dialect false more))
-      transition [:body dialect more] []
+      match (feed-transduce-all (get "l" el) els)
+        case [] (transition [:body dialect more] [])
+        case _ (transition state [])
       fail :unstreamable (string-join "" ["a feed's " (get "l" el) " element after its first entry, which changes the feed's members, written before its entries"])
 
 def feed-transduce-write [state item]
@@ -2639,7 +2649,7 @@ def feed-transduce-write [state item]
     case [[:head dialect els] (selected :member el)] (transition [:head dialect (push el els)] [])
     case [[:head dialect els] (selected :channel _)] (transition [:head dialect []] [])
     case [[:head dialect els] (selected :entry el)] (transition [:body dialect els] (flatten [(feed-transduce-head dialect true els) [(key "entries") array-start] (feed-transduce-entry dialect el)]))
-    case [[:body dialect els] (selected :member el)] (feed-transduce-late dialect els el)
+    case [[:body dialect els] (selected :member el)] (feed-transduce-late state dialect els el)
     case [[:body dialect els] (selected :channel _)] (fail :unstreamable "a channel after an item of the rss element, from which the reader reads the feed and its items in place of the rss element's")
     case [[:body dialect els] (selected :entry el)] (transition state (feed-transduce-entry dialect el))
     case _ (fail :protocol-order "the units of a feed came out of order, which the reading never makes")
