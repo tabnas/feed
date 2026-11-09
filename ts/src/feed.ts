@@ -959,13 +959,29 @@ const Feed: Plugin = function Feed(tn: Tabnas, options) {
 }
 
 
+// A feed parser: the engine with this plugin installed, `new
+// Tabnas().use(Feed, options)`, which reads a source from a reader a window
+// at a time (`tn.parseReader`, admin ADR-30) rather than whole. Its tokens
+// are @tabnas/xml's matcher's and the engine's own, which read the text only
+// through the lexer's window (from @tabnas/xml 0.7.20), and this plugin's
+// one hook converts the finished element tree and reads no text, so the
+// parser declares `lex.window`. The option is set here, on the parser this
+// package makes whole, and not in `Feed`, which a host may install beneath
+// matchers of its own.
+function make(options?: FeedOptions): Tabnas {
+  const tn = new Tabnas().use(Feed, options)
+  tn.options({ lex: { window: true } })
+  return tn
+}
+
+
 // VERSION is this package's version. It MUST equal package.json "version":
 // the release orchestrator rewrites both, and the version test fails the
 // build if they drift. Mirrors `const VERSION` in go/feed.go.
-const VERSION = '0.6.19'
+const VERSION = '0.6.21'
 
 
-export { VERSION, Feed, detect }
+export { VERSION, Feed, detect, make }
 
 export type {
   FeedFormat,

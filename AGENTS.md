@@ -157,16 +157,58 @@ the two constructions agreed on every one of the 4,105 inputs under
 `test/` in TypeScript and in Rust (results and error codes; only the
 `[jsonic/...]` or `[tabnas/...]` tag of a rendered message differs), and
 Go's C library already builds on the engine. The docs show the engine,
-and Rust's `make` builds on it:
+and each port's constructor builds on it:
 
 - TS: `new Tabnas().use(jsonic).use(Feed)` in the tests;
-  `new Tabnas().use(Feed)` in the docs (or `.use(Feed, { format })`).
+  `new Tabnas().use(Feed)` in the docs (or `.use(Feed, { format })`), and
+  `make(options)` builds that parser and declares the window (below).
 - Go: `j := jsonic.Make(); j.UseDefaults(feed.Feed, feed.Defaults, opts)`
-  in the tests; `tabnas.Make()` in the docs and the C library.
+  in the tests; `tabnas.Make()` in the docs and the C library, and
+  `Make(opts...)` builds that parser and declares the window.
 - Rust: `tabnas_feed::make()` and `make_with(&options)` build on
-  `tabnas::Tabnas::new()`; the tests install
+  `tabnas::Tabnas::new()` and declare the window; the tests install
   `parser.use_plugin(tabnas_feed::plugin(), Some(options.to_value()))` on
   a `tabnas_jsonic::make()` instance (`common::parser_with`).
+
+## Reading a source from a reader
+
+**The parser this package makes whole reads a reader a window at a time**
+(admin ADR-30; tabnas/parser's `doc/chunked-source.md`). `make()` in
+TypeScript, `Make()` in Go and `make()` and `make_with()` in Rust build
+the feed parser, the bare engine with the plugin, as
+`new Tabnas().use(Feed)` builds it, and declare the engine's `lex.window`
+option on it, so `tn.parseReader`, `ParseReader` and `parse_reader` hold
+the text from the oldest token the parser holds to some 64 KiB past the
+cursor, not the whole source. The option is declared there and never in
+the plugin function (`Feed`, `feed`, `plugin`), which a host may install
+beneath matchers of its own.
+
+**Nothing in this package reads the source.** The tokens are xml's
+matcher's and the engine's own, which read the text only through the
+lexer's window from xml 0.7.20 (xml's `AGENTS.md`, "Reading a source
+from a reader", says how). The plugin adds no matcher: its one hook, on
+the `xml` rule's close, converts the finished element tree, and its
+helpers read only that tree. So the window needed nothing here but its
+declaration. A matcher or an action added here that reads the source
+(`ctx.src()`, `Context.Src`, `Context::source`, or an index into the
+text) must read only the lexer's window, as xml's does, and the tests
+below must hold it to that.
+
+**The tests**: `ts/test/window.test.ts`, `go/window_test.go` and
+`rs/tests/window_test.rs` parse every fixture row and every document of
+the three corpora (`test/feedparser-wellformed/` and the fetched
+feedvalidator and feedparser trees) whole and from a reader that hands
+its bytes over in pieces of 1, 3 and 64 bytes, and a long feed whose
+tokens of every kind are longer than the window in larger pieces.
+TypeScript and Rust also read through windows of a few characters
+(margin and block 1 and 1, 3 and 2, 64 and 64, through the engine's
+hidden `parseReaderWithSizes` and `parse_reader_with_sizes`), which Go
+cannot set. The value, the tokens, the rule passes, and an error's code,
+position, row, column and token must be the same. An error's excerpt is
+not compared: a parse from a reader shows a long line only as far back
+as the window reaches (tabnas/parser's `DIVERGENCE.md`). Go reads its
+long documents in pieces of 61 bytes and more, since its engine copies
+the window at each read (tabnas/parser#321).
 
 ## Authority and alignment rules
 
@@ -739,6 +781,10 @@ value as hostile text.
   expected state.
 - `ts/test/perf.test.ts` / `go/perf_test.go` assert that reusing a parser
   instance is much faster than rebuilding one per parse.
+- `ts/test/window.test.ts` / `go/window_test.go` /
+  `rs/tests/window_test.rs` parse every fixture row and every corpus
+  document from a reader, a window at a time, against the same text
+  parsed whole. See "Reading a source from a reader" above.
 
 - `ts/test/feedvalidator.test.ts`, `TestFeedValidatorConformance` in
   `go/conformance_test.go` and `feedvalidator_conformance` in

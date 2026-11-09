@@ -4,7 +4,9 @@
 // anything real.
 #![allow(dead_code)]
 
+use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use tabnas::{Tabnas, Value};
 use tabnas_feed::{detect, FeedFormat, FeedOptions};
@@ -29,6 +31,67 @@ pub fn spec_dir() -> PathBuf {
 /// legitimately be absent: every caller fails rather than skips.
 pub fn wellformed_dir() -> PathBuf {
     repo_root().join("test").join("feedparser-wellformed")
+}
+
+/// The corpus directory, fetched first when it is not there. It NEVER
+/// returns without one: a missing corpus panics with the command that
+/// fixes it. `cargo test` has no pretest hook, which is how a suite ends
+/// up silently never running.
+pub fn require_corpus(dir: &str, script: &str) -> PathBuf {
+    let root = repo_root();
+    let full = root.join("test").join(dir);
+    if !full.exists() {
+        let fetch = Command::new("node")
+            .arg(root.join("scripts").join("fetch-corpus.mjs"))
+            .arg(dir)
+            .status();
+        if let Err(error) = fetch {
+            eprintln!("auto-fetch of the {dir} corpus failed: {error}");
+        }
+    }
+    assert!(
+        full.exists(),
+        "\n\nCONFORMANCE CORPUS MISSING: {}\n\
+         This suite cannot run without it, and must never be skipped.\n\
+         Fetch it (pinned commit, idempotent):\n\n    ./scripts/{script}\n\n\
+         See scripts/{script} for the upstream URL and pinned SHA.\n",
+        full.display()
+    );
+    full
+}
+
+/// Every `.xml` under a directory, sorted, so a failure list is stable
+/// between runs and between runtimes.
+pub fn walk_xml(dir: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(next) = stack.pop() {
+        let entries =
+            fs::read_dir(&next).unwrap_or_else(|e| panic!("read {}: {e}", next.display()));
+        for entry in entries {
+            let entry = entry.expect("a directory entry");
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().is_some_and(|ext| ext == "xml") {
+                out.push(path);
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// A corpus file as a string, LOSSILY. Some feedvalidator cases are not
+/// valid UTF-8 on purpose (a declared encoding the bytes contradict), and
+/// the other two runtimes see them decoded rather than rejected: Node's
+/// `readFileSync(p, 'utf8')` substitutes U+FFFD, and Go's `string(b)`
+/// yields U+FFFD for each invalid byte as the parser walks it. Reading
+/// strictly here would make this port disagree with both over a
+/// difference in file IO rather than in parsing.
+pub fn read_file(path: &Path) -> String {
+    let bytes = fs::read(path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    String::from_utf8_lossy(&bytes).into_owned()
 }
 
 /// An engine value as the fixture data model, through JSON: the

@@ -37,6 +37,12 @@ The input was RSS 2.0 but the result is in Atom shape: `title` is an
 Pass `{ format: 'native' }` to keep the source dialect's structure, or
 `{ format: 'raw' }` for the underlying `XmlElement` tree.
 
+`make()` builds the same parser and declares the engine's window option
+on it, so `parseReader` reads a feed from a reader a window at a time
+rather than whole. The
+[reference](doc/reference.md#registration-and-the-parse-entry) has the
+details.
+
 ## Documentation
 
 Full docs follow the four [Diátaxis](https://diataxis.fr) quadrants:

@@ -56,7 +56,7 @@ pub use tabnas::TabnasError as FeedError;
 /// This crate's version. It MUST equal `ts/package.json` `"version"` and
 /// `const VERSION` in `go/feed.go`; `tests/version_test.rs` fails the
 /// build if they drift.
-pub const VERSION: &str = "0.6.19";
+pub const VERSION: &str = "0.6.21";
 
 /// The name the plugin registers under, and so the namespace of its
 /// plugin options.
@@ -1554,8 +1554,17 @@ pub fn plugin() -> Plugin {
 }
 
 /// Build a feed parser with caller options: the engine, then this
-/// plugin, the `new Tabnas().use(Feed, options)` of the canonical package
-/// and the parser Go's C library builds with `tabnas.Make()`.
+/// plugin, the `make(options)` of the canonical package (`new
+/// Tabnas().use(Feed, options)`) and the `Make(options)` of the Go port.
+///
+/// The parser reads a source from a reader a window at a time
+/// ([`Tabnas::parse_reader`], admin ADR-30) rather than whole: its tokens
+/// are tabnas-xml's matcher's and the engine's own, which read the source
+/// only through the lexer's window, and this plugin's one hook converts the
+/// finished element tree and reads no text, so the parser declares
+/// `lex.window`. The option is set here, on the parser this crate makes
+/// whole, and not in [`feed`] or [`plugin`], which a host may install
+/// beneath matchers of its own.
 ///
 /// ```
 /// let options = tabnas_feed::FeedOptions {
@@ -1572,6 +1581,9 @@ pub fn make_with(options: &FeedOptions) -> Tabnas {
     parser
         .use_plugin(plugin(), Some(options.to_value()))
         .expect("the feed plugin installs on the engine");
+    parser
+        .set_options(|options| options.lex.window = true)
+        .expect("lex.window sets");
     parser
 }
 

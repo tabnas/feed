@@ -22,7 +22,7 @@ import (
 // VERSION is this module's version. It MUST equal ts/package.json
 // "version": the release orchestrator rewrites both, and
 // TestVersionMatchesPackageJSON fails the build if they drift.
-const VERSION = "0.6.19"
+const VERSION = "0.6.21"
 
 // Defaults are merged with caller-supplied options when the plugin is
 // registered via jsonic.UseDefaults. Supported options:
@@ -1262,6 +1262,43 @@ func Convert(root any, format string) (any, error) {
 		return rss1ToAtom(n), nil
 	}
 	return nil, fmt.Errorf("feed: internal: unhandled native type")
+}
+
+// Make returns a feed parser: the engine with this plugin installed and
+// configured with options, the counterpart of TypeScript's make(options)
+// and Rust's make_with. It is the engine of tabnas.Make() then
+//
+//	err := j.UseDefaults(Feed, Defaults, options)
+//
+// the parser the docs and the C library build. The option keys are the
+// plugin's own (see Defaults); more than one map is merged in order, a
+// later key winning.
+//
+// The parser reads a source from a reader a window at a time
+// (ParseReader, admin ADR-30) rather than whole: its tokens are xml's
+// matcher's and the engine's own, which read the text only through the
+// lexer's window (from github.com/tabnas/xml/go v0.7.20), and this plugin's
+// one hook converts the finished element tree and reads no text, so the
+// parser declares Lex.Window. The option is set here, on the parser this
+// package makes whole, and not in Feed, which a host may install beneath
+// matchers of its own.
+//
+// It returns an error rather than panicking, as xml's Make does, because
+// the options are the caller's data.
+func Make(options ...map[string]any) (*tabnas.Tabnas, error) {
+	j := tabnas.Make()
+	merged := map[string]any{}
+	for _, o := range options {
+		if o != nil {
+			merged = tabnas.Deep(merged, o).(map[string]any)
+		}
+	}
+	if err := j.UseDefaults(Feed, Defaults, merged); err != nil {
+		return nil, err
+	}
+	window := true
+	j.SetOptions(tabnas.Options{Lex: &tabnas.LexOptions{Window: &window}})
+	return j, nil
 }
 
 // --- jsonic Plugin --------------------------------------------------------

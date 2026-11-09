@@ -19,7 +19,8 @@ the parsed feed. This file covers only what is specific to this crate.
 | `tests/perf_test.rs` | reusing an instance beats rebuilding one, mirrored from `go/perf_test.go` |
 | `tests/version_test.rs` | `Cargo.toml`, `VERSION`, `ts/package.json` and `go/feed.go` must agree |
 | `tests/translate_test.rs` | the translation parts: the render, the embedding and the transducer part the embedded manifest names are the ones the crate embeds, the manifest's shapes, root, schema and loss lines and its `transduce` with no `whole`, every definition of the three named `feed-...` (the transducer's `feed-transduce-...`) and none in two of them, and the codes the transducer part fails with |
-| `tests/common/mod.rs` | the parsers, the value normaliser and the fixture runner the suites share |
+| `tests/window_test.rs` | every fixture row and every corpus document parsed from a reader, a window at a time, against the same text parsed whole, mirrored from `ts/test/window.test.ts` and `go/window_test.go` |
+| `tests/common/mod.rs` | the parsers, the value normaliser, the fixture runner and the corpus walk the suites share |
 | `README.md` | the crate front page, doctested, and in the gated prose set |
 
 ## Crates by path
@@ -29,7 +30,8 @@ the parsed feed. This file covers only what is specific to this crate.
 (`../../support/rs`, feature `serde_json`), `tabnas-debug`
 (`../../debug/rs`) and `tabnas-jsonic` (`../../jsonic/rs`, which brings
 `tabnas-json`). `make`, `make_with` and `parse` build on the bare engine,
-`Tabnas::new()`, on the maintainer's ruling of 2026-10-06; jsonic is for
+`Tabnas::new()`, on the maintainer's ruling of 2026-10-06, and declare
+`lex.window` (`../AGENTS.md`, "Reading a source from a reader"); jsonic is for
 the tests, which build their parsers as `tabnas_jsonic::make()` plus the
 plugin, as the canonical suites do (`common::parser_with`). Clone them
 as siblings before running cargo, and expect `Cargo.lock` to move when
